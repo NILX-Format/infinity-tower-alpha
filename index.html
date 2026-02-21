@@ -206,7 +206,7 @@
         <span class="auto-mode">🤖 Infinity Tower · 基石传承</span> | 自动战斗 | 波次升级 | 遗物永久成长
     </div>
 
-    <div id="versionLabel" style="position:absolute;top:6px;right:12px;font-size:12px;color:#888;font-family:monospace;z-index:100;pointer-events:none;">v0.7.0 alpha
+    <div id="versionLabel" style="position:absolute;top:6px;right:12px;font-size:12px;color:#888;font-family:monospace;z-index:100;pointer-events:none;">v0.8.0 alpha
     </div>
 
     <div id="mainMenu" style="
@@ -239,7 +239,7 @@
     <br><br>
 
     <div style="font-size:12px;color:#777">
-    v0.7.0 a
+    v0.8.0 a
     </div>
 
     </div>
@@ -376,6 +376,20 @@ class Game {
         };
         this.viewCap = 600;
         this.floatingTexts = [];
+        this.relicEffects = [];
+
+        const legacyRelicRaw = localStorage.getItem("metaRelics");
+        const legacyRelicValue = /^\d+$/.test(legacyRelicRaw || "") ? parseInt(legacyRelicRaw, 10) : 0;
+        this.meta = {
+            relics: parseInt(
+                localStorage.getItem("metaRelicsCurrency") || String(legacyRelicValue) || "0"
+            ),
+
+            lifetimeKills: parseInt(
+                localStorage.getItem("metaKills") || "0"
+            )
+
+        };
 
         // ===== Regen Suppression System =====
         this.regenSuppressionTimer = 0;
@@ -748,6 +762,21 @@ class Game {
 
     // 统一敌人死亡 Hook，所有 keystone/relic 触发都集中在这里
     onEnemyKilled(enemy) {
+        this.meta.lifetimeKills++;
+        this.saveMeta();
+
+        if (Math.random() < 0.15)
+        {
+            this.meta.relics++;
+
+            this.createRelicPickupEffect(
+                enemy.x,
+                enemy.y
+            );
+
+            this.saveMeta();
+        }
+
         if (enemy.type === 'SCOUT' && this.hasKeystone('SIGNAL_ECHO')) {
             this.turret.stats.view = Math.min(this.viewCap, this.turret.stats.view + 5);
         }
@@ -764,6 +793,19 @@ class Game {
         // 未来新增 keystone 效果只需在这里加
     }
 
+    saveMeta()
+    {
+        localStorage.setItem(
+            "metaRelicsCurrency",
+            this.meta.relics
+        );
+
+        localStorage.setItem(
+            "metaKills",
+            this.meta.lifetimeKills
+        );
+    }
+
     saveRun() {
         const data = {
             wave: this.wave,
@@ -774,6 +816,7 @@ class Game {
             metaRelics: this.metaRelics
         };
         localStorage.setItem("infinityTowerSave", JSON.stringify(data));
+        this.saveMeta();
     }
 
     loadRun() {
@@ -871,6 +914,18 @@ class Game {
     createShieldRestoreEffect(x, y) {
         this.createExplosion(x, y, '#7ad3ff', 12);
         this.spawnFloatingText(x, y - 36, 'SHIELD RESTORED', '#7ad3ff', 0.9);
+    }
+
+    createRelicPickupEffect(x, y)
+    {
+        this.relicEffects.push({
+
+            x,
+            y,
+
+            life: 40
+
+        });
     }
 
     spawnFloatingText(x, y, text, color = "#ffffff", scale = 1) {
@@ -2658,7 +2713,16 @@ class Game {
         
         this.drawFog();
         this.drawGameObjects();
+        this.drawRelicEffects(ctx);
         this.drawRangeIndicators();
+
+        ctx.fillStyle = "#ffd700";
+        ctx.font = "12px monospace";
+        ctx.fillText(
+            "Relics: " + this.meta.relics,
+            10,
+            20
+        );
 
         // Radar：平滑展开/收起动画
         const radarTarget = this.radarExpanded ? 1 : 0;
@@ -2766,6 +2830,41 @@ class Game {
 
             if (f.life <= 0)
                 this.bioFields.splice(i,1);
+        }
+    }
+
+    drawRelicEffects(ctx)
+    {
+        for (let i =
+            this.relicEffects.length - 1;
+            i >= 0;
+            i--)
+        {
+            const r =
+                this.relicEffects[i];
+
+            const alpha =
+                r.life / 40;
+
+            ctx.fillStyle =
+                `rgba(255,215,0,${alpha})`;
+
+            ctx.beginPath();
+
+            ctx.arc(
+                r.x,
+                r.y,
+                4,
+                0,
+                Math.PI*2
+            );
+
+            ctx.fill();
+
+            r.life--;
+
+            if (r.life <= 0)
+                this.relicEffects.splice(i,1);
         }
     }
 
@@ -2966,6 +3065,26 @@ class Game {
             ctx.fill();
 
             this.laserFlash--;
+        }
+
+        if (this.keystones && this.keystones.OVERCHARGE_PROTOCOL)
+        {
+            ctx.strokeStyle =
+                "rgba(255,100,100,0.6)";
+
+            ctx.lineWidth = 2;
+
+            ctx.beginPath();
+
+            ctx.arc(
+                this.turret.x,
+                this.turret.y,
+                30,
+                0,
+                Math.PI*2
+            );
+
+            ctx.stroke();
         }
 
         this.drawArmorArc(ctx);
