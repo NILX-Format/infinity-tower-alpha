@@ -30,6 +30,8 @@
         #hp {
             color: #ff6b6b; font-weight: bold; position: absolute; left: 50%;
             transform: translateX(-50%); pointer-events: none; z-index: 2;
+            font-size: calc(11px * var(--ui-scale)); letter-spacing: 0.5px;
+            text-align: center; white-space: nowrap;
         }
         #wave { color: #4ecdc4; }
         #weaponStatus { color: #ffd93d; }
@@ -43,6 +45,9 @@
             pointer-events: auto;
         }
         #speedControls button:hover { background: #444; }
+        #speedControls button.active { background: #2a5a4a; border-color: #4ecdc4; color: #4ecdc4; font-weight: bold; }
+        #muteBtn { min-width: 36px; }
+        #muteBtn.muted { color: #ff6b6b; border-color: #ff6b6b; }
         #statusDock {
             position: absolute; bottom: 10px; right: 10px; display: flex;
             flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: auto;
@@ -141,9 +146,10 @@
         <div class="stat" id="hp">❤️ HP: 10/10</div>
 
         <div id="speedControls">
-            <button onclick="game.setSpeed(1.0)">x1.0</button>
-            <button onclick="game.setSpeed(2.0)">x2.0</button>
-            <button onclick="game.setSpeed(3.0)" style="color: #ff6b6b;">x3.0</button>
+            <button id="speedBtn1" onclick="game.setSpeed(1.0)">x1.0</button>
+            <button id="speedBtn2" onclick="game.setSpeed(2.0)">x2.0</button>
+            <button id="speedBtn3" onclick="game.setSpeed(3.0)">x3.0</button>
+            <button id="muteBtn" title="Toggle Sound">🔊</button>
         </div>
         <button id="resetProgressBtn">⚠ RESET</button>
         
@@ -226,19 +232,17 @@
 
     <h1 style="margin-top:0">Infinity Tower</h1>
 
-    <button id="continueBtn">Continue Run</button>
-    <br><br>
+    <button id="continueBtn">▶ Continue Run</button>
+    <div id="continueInfo" style="font-size:11px;color:#4ecdc4;margin-top:4px;min-height:16px;"></div>
+    <br>
 
-    <button id="newRunBtn">New Run</button>
-    <br><br>
+    <button id="newRunBtn">⚡ New Run</button>
+    <div style="font-size:11px;color:#888;margin-top:4px;">从头开始（永久遗物保留）</div>
+    <br>
 
     <button id="resetBtn" style="color:#ff6b6b">
     Reset Progress
     </button>
-
-    <br><br>
-
-    <button id="muteBtn">Sound: ON</button>
 
     <br><br>
 
@@ -407,6 +411,8 @@ class Game {
         this.laserTimer = 0;
         this.timeScale = 1.0;
         this.waveTransitioning = false;
+        this.waveCountdown = 0;
+        this.waveCountdownTimer = 0;
         this.markedTarget = null;
         this.markTimer = 0;
         this.markCooldown = 0;
@@ -1378,6 +1384,11 @@ class Game {
     setSpeed(speed) {
         this.resumeAudio();
         this.timeScale = speed;
+        // 更新速度按钮高亮
+        [1, 2, 3].forEach(n => {
+            const btn = document.getElementById(`speedBtn${n}`);
+            if (btn) btn.classList.toggle('active', speed === n * 1.0);
+        });
         console.log("游戏速度:", speed + "x");
     }
 
@@ -1781,6 +1792,9 @@ class Game {
     }
 
     update(dt) {
+        // 倒计时在 isPaused 期间仍需更新
+        this.updateWaveCountdown(dt);
+
         if (this.gameOver || this.isPaused) return;
 
         if (this.laserTimer > 0) this.laserTimer = Math.max(0, this.laserTimer - dt);
@@ -2790,8 +2804,24 @@ class Game {
         this.spawnTimer = 0;
         this.waveTransitioning = false;
         this.activeFlares = this.activeFlares.filter(flare => flare.expiresAtWave > this.wave);
-        this.isPaused = false;
+
+        // 倒数 3 秒再解除暂停
+        this.waveCountdown = 3;
+        this.waveCountdownTimer = 0;
+        this.isPaused = true; // 保持暂停，由 countdown 解除
         console.log(`进入 Wave ${this.wave}, 敌人数量: ${this.enemiesToSpawn}`);
+    }
+
+    updateWaveCountdown(dt) {
+        if (this.waveCountdown <= 0) return;
+        this.waveCountdownTimer += dt;
+        if (this.waveCountdownTimer >= 60) { // 60 ticks ≈ 1秒
+            this.waveCountdownTimer = 0;
+            this.waveCountdown--;
+            if (this.waveCountdown <= 0) {
+                this.isPaused = false;
+            }
+        }
     }
 
     // ===== Node Threshold System =====
@@ -3022,6 +3052,44 @@ class Game {
         const rcy    = lerp(canvas.height - 120, canvas.height / 2, this.radarTransition);
         const rradius = lerp(70, 180, this.radarTransition);
         this.drawHeptagonRadar(ctx, rcx, rcy, rradius);
+
+        // Wave 倒计时覆盖层
+        this.drawWaveCountdown();
+    }
+
+    drawWaveCountdown() {
+        if (this.waveCountdown <= 0) return;
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+
+        // 半透明遮罩
+        ctx.fillStyle = 'rgba(0,0,0,0.45)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Wave 标题
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#4ecdc4';
+        ctx.font = 'bold 28px monospace';
+        ctx.fillText(`— WAVE ${this.wave} —`, cx, cy - 60);
+
+        // 数字（有脉冲感）
+        const pulse = 1 + 0.15 * Math.sin(this.waveCountdownTimer * 0.2);
+        const numSize = Math.round(96 * pulse);
+        ctx.font = `bold ${numSize}px monospace`;
+
+        // 颜色随倒计时变化
+        const colors = ['#ff6b6b', '#ffd93d', '#4ecdc4'];
+        ctx.fillStyle = colors[this.waveCountdown - 1] || '#fff';
+        ctx.shadowColor = ctx.fillStyle;
+        ctx.shadowBlur = 20;
+        ctx.fillText(String(this.waveCountdown), cx, cy + 30);
+        ctx.shadowBlur = 0;
+
+        // 副文字
+        ctx.font = '16px monospace';
+        ctx.fillStyle = '#aaa';
+        ctx.fillText('准备好了吗？', cx, cy + 70);
+        ctx.textAlign = 'left';
     }
 
     drawFog() {
@@ -3640,81 +3708,144 @@ class Game {
         ctx.fillRect(x, y, width * clamped, height);
     }
 
+    // ── HP ring (smooth 360° arc, colour shifts green→yellow→red) ──
     drawTurretBars() {
-        const x = this.turret.x - 36;
-        const y = this.turret.y - 56;
-        const width = 72;
+        const { x, y } = this.turret;
+        const hpRatio  = this.turret.stats.maxHp > 0
+            ? Math.max(0, this.turret.stats.hp / this.turret.stats.maxHp)
+            : 0;
 
-        const hpRatio = this.turret.stats.maxHp > 0 ? (this.turret.stats.hp / this.turret.stats.maxHp) : 0;
-        this.drawBar(x, y, width, 5, hpRatio, '#6bcb77');
+        const HP_R      = 38;   // ring radius
+        const HP_W      = 6;    // stroke width
+        const START     = -Math.PI / 2;          // 12 o'clock
+        const END       = START + Math.PI * 2 * hpRatio;
+
+        // colour: green → yellow → red
+        let hpColor;
+        if (hpRatio > 0.5)      hpColor = '#6bcb77';
+        else if (hpRatio > 0.25) hpColor = '#ffd93d';
+        else                     hpColor = '#ff6b6b';
+
+        // low-HP pulse
+        const lowPulse = hpRatio < 0.25
+            ? 0.55 + 0.45 * Math.sin(Date.now() * 0.006)
+            : 1;
+
+        ctx.save();
+
+        // track (dim background ring)
+        ctx.beginPath();
+        ctx.arc(x, y, HP_R, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+        ctx.lineWidth   = HP_W;
+        ctx.stroke();
+
+        // filled arc
+        if (hpRatio > 0) {
+            ctx.beginPath();
+            ctx.arc(x, y, HP_R, START, END);
+            ctx.strokeStyle = hpColor;
+            ctx.globalAlpha = lowPulse;
+            ctx.lineWidth   = HP_W;
+            ctx.shadowBlur  = hpRatio < 0.25 ? 10 : 4;
+            ctx.shadowColor = hpColor;
+            ctx.stroke();
+            ctx.shadowBlur  = 0;
+            ctx.globalAlpha = 1;
+        }
+
+        // regen spark — a bright dot that orbits the ring tip
+        const regenRate = this.currentRegenRate || 0;
+        if (regenRate > 0 && hpRatio < 1) {
+            const sparkAngle = END;
+            const sparkX = x + Math.cos(sparkAngle) * HP_R;
+            const sparkY = y + Math.sin(sparkAngle) * HP_R;
+            const sparkAlpha = 0.5 + 0.5 * Math.sin(Date.now() * 0.012);
+            ctx.beginPath();
+            ctx.arc(sparkX, sparkY, 3.5, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffffff';
+            ctx.globalAlpha = sparkAlpha;
+            ctx.shadowBlur  = 8;
+            ctx.shadowColor = '#6bcb77';
+            ctx.fill();
+            ctx.shadowBlur  = 0;
+            ctx.globalAlpha = 1;
+        }
+
+        ctx.restore();
     }
 
+    // ── Shield rebuild sweep (replaces the old flat bar) ──
     drawShieldRebuildBar(ctx) {
         const shield = this.turret.shield;
+        if (shield.state !== "BROKEN" || shield.max <= 0) return;
 
-        if (shield.state !== "BROKEN")
-            return;
+        const ratio  = shield.rebuildProgress / shield.rebuildRequired;
+        const SH_R   = 50;
+        const START  = -Math.PI / 2;
+        const sweep  = Math.PI * 2 * ratio;
 
-        const ratio =
-            shield.rebuildProgress /
-            shield.rebuildRequired;
-
-        const width = 40;
-        const height = 4;
-
-        const x =
-            this.turret.x - width / 2;
-
-        const y =
-            this.turret.y + 35;
-
-        ctx.fillStyle = "#222";
-
-        ctx.fillRect(
-            x,
-            y,
-            width,
-            height
-        );
-
-        ctx.fillStyle = "#44aaff";
-
-        ctx.fillRect(
-            x,
-            y,
-            width * ratio,
-            height
-        );
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(this.turret.x, this.turret.y, SH_R, START, START + sweep);
+        ctx.strokeStyle = 'rgba(80,160,255,0.35)';
+        ctx.lineWidth   = 4;
+        ctx.setLineDash([4, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
     }
 
+    // ── Segmented shield arc (structural, discrete segments) ──
     drawArmorArc(ctx) {
         const shield = this.turret.shield;
-        if (shield.current <= 0 || shield.max <= 0)
-            return;
+        if (shield.max <= 0) return;
 
-        const ratio = shield.current / shield.max;
-        let growth = 1;
+        const armorLevel = this.turret.stats.armor || 0;
+        // each armor point = one segment; cap display at 12 segments for readability
+        const totalSegs  = Math.min(armorLevel, 12);
+        if (totalSegs === 0) return;
 
-        if (shield.rebuildFlash > 0)
-        {
-            growth =
-                1 - (shield.rebuildFlash / 20);
+        const filledSegs = Math.ceil((shield.current / shield.max) * totalSegs);
 
+        const SH_R   = 50;           // shield ring radius
+        const GAP    = 0.06;         // radians gap between segments
+        const ARC    = (Math.PI * 2 - GAP * totalSegs) / totalSegs;
+        const START  = -Math.PI / 2; // 12 o'clock
+
+        // rebuild-complete flash: expand outward briefly
+        let flashOffset = 0;
+        if (shield.rebuildFlash > 0) {
+            flashOffset = (shield.rebuildFlash / 20) * 6;
             shield.rebuildFlash--;
         }
 
         ctx.save();
-        ctx.strokeStyle = `rgba(80,180,255,${0.4 + ratio * 0.6})`;
-        ctx.lineWidth = 6;
-        ctx.beginPath();
-        ctx.arc(
-            this.turret.x,
-            this.turret.y,
-            shield.radius,
-            Math.PI*(0.5 - growth*0.25),
-            Math.PI*(0.5 + growth*0.25)
-        );
-        ctx.stroke();
+
+        for (let i = 0; i < totalSegs; i++) {
+            const segStart = START + i * (ARC + GAP);
+            const segEnd   = segStart + ARC;
+            const filled   = i < filledSegs;
+
+            ctx.beginPath();
+            ctx.arc(this.turret.x, this.turret.y, SH_R + flashOffset, segStart, segEnd);
+
+            if (filled) {
+                const ratio = shield.current / shield.max;
+                ctx.strokeStyle = `rgba(80,180,255,${0.55 + ratio * 0.45})`;
+                ctx.lineWidth   = 5;
+                ctx.shadowBlur  = 6;
+                ctx.shadowColor = '#4db8ff';
+            } else {
+                // empty segment — dim ghost
+                ctx.strokeStyle = 'rgba(80,140,200,0.15)';
+                ctx.lineWidth   = 4;
+                ctx.shadowBlur  = 0;
+            }
+            ctx.stroke();
+        }
+
+        ctx.shadowBlur = 0;
         ctx.restore();
     }
 
@@ -3726,12 +3857,13 @@ class Game {
     }
 
     updateUI() {
-        const hpText = `❤️ HP: ${Math.ceil(this.turret.stats.hp)}/${this.turret.stats.maxHp}`;
-        let glow = this.currentRegenRate || this.getRegenRate();
-        if (this.regenSuppressed) glow *= 0.3;
-        const glowPx = Math.max(2, Math.min(14, glow * 6));
-        this.ui.hp.style.textShadow = `0 0 ${glowPx}px ${this.regenSuppressed ? '#ffaa44' : '#6bcb77'}`;
-        this.ui.hp.style.color = this.regenSuppressed ? '#ffd1a3' : '#ffffff';
+        // HP 文字：只在低血量（<50%）时显示具体数字，其余时间环形足够
+        const hpRatio = this.turret.stats.maxHp > 0 ? this.turret.stats.hp / this.turret.stats.maxHp : 0;
+        const hpText = hpRatio < 0.5
+            ? `❤️ ${Math.ceil(this.turret.stats.hp)}/${this.turret.stats.maxHp}`
+            : '';
+        this.ui.hp.style.color = hpRatio < 0.25 ? '#ff6b6b' : '#ffd93d';
+        this.ui.hp.style.textShadow = hpRatio < 0.25 ? '0 0 8px #ff6b6b' : '0 0 6px #ffd93d';
 
         let hostileCount = 0;
         this.enemies.forEach(e => { if (this.isHostile(e)) hostileCount++; });
@@ -3744,8 +3876,7 @@ class Game {
             `🛡️ ARM:${this.collectedResources.armor || 0} | ` +
             `🧨 FLR:${this.flareCharges}`;
 
-        this.setText('hp', this.ui.hp, hpText);
-        this.setText('wave', this.ui.wave, waveText);
+        this.setText('hp', this.ui.hp, hpText);        this.setText('wave', this.ui.wave, waveText);
         this.setText('enemyStatus', this.ui.enemyStatus, enemyText);
         this.setText('statusResources', this.ui.statusResources, resourceText);
         this.setText('currentWeapon', this.ui.currentWeapon, this.getWeaponName(this.getActiveWeapon()));
@@ -3761,7 +3892,7 @@ class Game {
         const critStats = this.computeCritStats(this.turret.stats.special || 0);
         this.setText('statSpecial', this.ui.statSpecial, `${(critStats.critChance * 100).toFixed(0)}%`);
         this.setText('weaponStatus', this.ui.weaponStatus, `🎯 ${this.getWeaponName(this.getActiveWeapon())}`);
-        this.ui.hp.style.top = `${this.turret.y + 38}px`;
+        this.ui.hp.style.top  = `${this.turret.y + 62}px`;
         this.ui.hp.style.left = `${this.turret.x}px`;
         this.updateRelicUI();
         this.updateKeystoneUI();  // 第7步：更新基石UI
@@ -3954,6 +4085,7 @@ function startGame(loadSave)
     game.updateShieldStats();
     game.updateUI();
     game.isPaused = false;
+    game.setSpeed(1.0); // 初始化速度按钮高亮
     game.loop();
 }
 
@@ -3978,24 +4110,32 @@ document.getElementById("resetBtn").onclick = () =>
 };
 
 const muteBtn = document.getElementById("muteBtn");
-muteBtn.onclick =
-() =>
+muteBtn.onclick = () =>
 {
     if (!game) return;
-
-    game.audio.enabled =
-        !game.audio.enabled;
-
-    muteBtn.innerText =
-        game.audio.enabled
-        ? "Sound: ON"
-        : "Sound: OFF";
+    game.audio.enabled = !game.audio.enabled;
+    muteBtn.textContent = game.audio.enabled ? "🔊" : "🔇";
+    muteBtn.classList.toggle('muted', !game.audio.enabled);
 };
 
 if (!localStorage.getItem("infinityTowerSave"))
 {
     document.getElementById("continueBtn").disabled = true;
     document.getElementById("continueBtn").style.opacity = 0.5;
+    document.getElementById("continueInfo").textContent = "（暂无存档）";
+}
+else
+{
+    try {
+        const save = JSON.parse(localStorage.getItem("infinityTowerSave"));
+        const wave = save.wave || "?";
+        const atk  = save.turretStats?.atk?.toFixed(0) || "?";
+        const hp   = save.turretStats?.maxHp || "?";
+        document.getElementById("continueInfo").textContent =
+            `Wave ${wave} · ATK ${atk} · HP ${hp}`;
+    } catch(e) {
+        document.getElementById("continueInfo").textContent = "存档已记录";
+    }
 }
 </script>
 </body>
