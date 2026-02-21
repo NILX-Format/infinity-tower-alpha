@@ -142,9 +142,8 @@
 
         <div id="speedControls">
             <button onclick="game.setSpeed(1.0)">x1.0</button>
-            <button onclick="game.setSpeed(1.5)">x1.5</button>
             <button onclick="game.setSpeed(2.0)">x2.0</button>
-            <button onclick="game.setSpeed(5.0)" style="color: #ff6b6b;">x5.0</button>
+            <button onclick="game.setSpeed(3.0)" style="color: #ff6b6b;">x3.0</button>
         </div>
         <button id="resetProgressBtn">⚠ RESET</button>
         
@@ -207,7 +206,7 @@
         <span class="auto-mode">🤖 Infinity Tower · 基石传承</span> | 自动战斗 | 波次升级 | 遗物永久成长
     </div>
 
-    <div id="versionLabel" style="position:absolute;top:6px;right:12px;font-size:12px;color:#888;font-family:monospace;z-index:100;pointer-events:none;">v0.3.0 alpha
+    <div id="versionLabel" style="position:absolute;top:6px;right:12px;font-size:12px;color:#888;font-family:monospace;z-index:100;pointer-events:none;">v0.5.0 alpha
     </div>
 
     <div id="mainMenu" style="
@@ -240,7 +239,7 @@
     <br><br>
 
     <div style="font-size:12px;color:#777">
-    v0.4.0 alpha
+    v0.5.0 a
     </div>
 
     </div>
@@ -382,6 +381,7 @@ class Game {
         this.regenSuppressed = false;
         this.currentRegenRate = 0;
         this.suppressionHintCooldown = 0;
+        this.fallbackCooldown = 0;
 
         // ===== Enemy Role System =====
         this.ENEMY_TYPES = {
@@ -1322,35 +1322,32 @@ class Game {
             case 'REFLECT_SHIELD':  this.fireWeapon_REFLECT_SHIELD();  break;
             default:                this.fireBullet();                  break;
         }
-        this.fireFallbackBullet();
+        this.fireFallbackWeapon();
     }
 
-    fireFallbackBullet() {
+    fireFallbackWeapon() {
         if (!this.turret.target) return;
-
-        if (!this.fallbackCooldown)
-            this.fallbackCooldown = 0;
 
         if (this.fallbackCooldown > 0) {
             this.fallbackCooldown--;
             return;
         }
 
-        this.fallbackCooldown = 60;
-
-        const dmg = this.turret.stats.atk * 0.3;
+        this.fallbackCooldown = 45;
         const angle = Math.atan2(
             this.turret.target.y - this.turret.y,
             this.turret.target.x - this.turret.x
         );
+        const damage = this.turret.stats.atk * 0.30;
 
         this.bullets.push({
             x: this.turret.x,
             y: this.turret.y,
             vx: Math.cos(angle) * 6,
             vy: Math.sin(angle) * 6,
-            damage: dmg,
+            damage: damage,
             radius: 2,
+            color: "#6a7a8a",
             isFallback: true,
             isCannon: false,
             speed: 6,
@@ -2683,7 +2680,7 @@ class Game {
         }
         
         this.bullets.forEach(b => {
-            ctx.fillStyle = b.isCannon ? '#ff9f43' : '#ffd93d';
+            ctx.fillStyle = b.color || (b.isCannon ? '#ff9f43' : '#ffd93d');
             ctx.beginPath(); 
             ctx.arc(b.x, b.y, b.radius, 0, Math.PI*2); 
             ctx.fill();
@@ -2773,8 +2770,6 @@ class Game {
             ctx.restore();
         });
 
-        this.drawArmorArc(ctx);
-        
         ctx.save();
         ctx.translate(this.turret.x, this.turret.y);
         ctx.rotate(this.turret.angle);
@@ -2828,6 +2823,8 @@ class Game {
         ctx.fill();
         
         ctx.restore();
+        this.drawArmorArc(ctx);
+        this.drawShieldRebuildBar(ctx);
         this.drawTurretBars();
 
         this.structures.forEach(s => {
@@ -3060,6 +3057,44 @@ class Game {
 
         const hpRatio = this.turret.stats.maxHp > 0 ? (this.turret.stats.hp / this.turret.stats.maxHp) : 0;
         this.drawBar(x, y, width, 5, hpRatio, '#6bcb77');
+    }
+
+    drawShieldRebuildBar(ctx) {
+        const shield = this.turret.shield;
+
+        if (shield.state !== "BROKEN")
+            return;
+
+        const ratio =
+            shield.rebuildProgress /
+            shield.rebuildRequired;
+
+        const width = 40;
+        const height = 4;
+
+        const x =
+            this.turret.x - width / 2;
+
+        const y =
+            this.turret.y + 35;
+
+        ctx.fillStyle = "#222";
+
+        ctx.fillRect(
+            x,
+            y,
+            width,
+            height
+        );
+
+        ctx.fillStyle = "#44aaff";
+
+        ctx.fillRect(
+            x,
+            y,
+            width * ratio,
+            height
+        );
     }
 
     drawArmorArc(ctx) {
