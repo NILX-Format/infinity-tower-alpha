@@ -206,7 +206,7 @@
         <span class="auto-mode">🤖 Infinity Tower · 基石传承</span> | 自动战斗 | 波次升级 | 遗物永久成长
     </div>
 
-    <div id="versionLabel" style="position:absolute;top:6px;right:12px;font-size:12px;color:#888;font-family:monospace;z-index:100;pointer-events:none;">v0.6.0 alpha
+    <div id="versionLabel" style="position:absolute;top:6px;right:12px;font-size:12px;color:#888;font-family:monospace;z-index:100;pointer-events:none;">v0.7.0 alpha
     </div>
 
     <div id="mainMenu" style="
@@ -239,7 +239,7 @@
     <br><br>
 
     <div style="font-size:12px;color:#777">
-    v0.6.0 a
+    v0.7.0 a
     </div>
 
     </div>
@@ -332,7 +332,8 @@ class Game {
                 radius: 0,
                 rebuildProgress: 0,
                 rebuildRequired: 12,
-                state: "ACTIVE"
+                state: "ACTIVE",
+                rebuildFlash: 0
             }
         };
 
@@ -383,6 +384,9 @@ class Game {
         this.currentRegenRate = 0;
         this.suppressionHintCooldown = 0;
         this.fallbackCooldown = 0;
+        this.manifestFlash = 0;
+        this.lastManifestType = null;
+        this.laserFlash = 0;
 
         // ===== Enemy Role System =====
         this.ENEMY_TYPES = {
@@ -753,6 +757,7 @@ class Game {
                 this.turret.shield.state = "ACTIVE";
                 this.turret.shield.current = this.turret.shield.max;
                 this.turret.shield.rebuildProgress = 0;
+                this.turret.shield.rebuildFlash = 20;
                 this.createShieldRestoreEffect(this.turret.x, this.turret.y);
             }
         }
@@ -1366,6 +1371,8 @@ class Game {
 
         const effective =
             this.getEffectiveCombatStats();
+
+        this.laserFlash = 4;
 
         const damage =
             effective.atk * effective.tickMultiplier * 0.3;
@@ -2314,6 +2321,12 @@ class Game {
             this.currentWeapon = newWeapon;
             this.onWeaponChanged(newWeapon);
         }
+
+        if (this.currentWeapon !== this.lastManifestType)
+        {
+            this.manifestFlash = 12;
+            this.lastManifestType = this.currentWeapon;
+        }
     }
 
     onWeaponChanged(weapon) {
@@ -2909,6 +2922,52 @@ class Game {
         ctx.fill();
         
         ctx.restore();
+
+        if (this.manifestFlash > 0)
+        {
+            const ratio =
+                this.manifestFlash / 12;
+
+            ctx.strokeStyle =
+                `rgba(255,255,255,${ratio})`;
+
+            ctx.lineWidth = 3;
+
+            ctx.beginPath();
+
+            ctx.arc(
+                this.turret.x,
+                this.turret.y,
+                25 + (1-ratio)*10,
+                0,
+                Math.PI*2
+            );
+
+            ctx.stroke();
+
+            this.manifestFlash--;
+        }
+
+        if (this.laserFlash > 0)
+        {
+            ctx.fillStyle =
+                "rgba(255,217,61,0.4)";
+
+            ctx.beginPath();
+
+            ctx.arc(
+                this.turret.x,
+                this.turret.y,
+                10 + this.laserFlash*2,
+                0,
+                Math.PI*2
+            );
+
+            ctx.fill();
+
+            this.laserFlash--;
+        }
+
         this.drawArmorArc(ctx);
         this.drawShieldRebuildBar(ctx);
         this.drawTurretBars();
@@ -3185,9 +3244,20 @@ class Game {
 
     drawArmorArc(ctx) {
         const shield = this.turret.shield;
-        if (shield.current <= 0 || shield.max <= 0) return;
+        if (shield.current <= 0 || shield.max <= 0)
+            return;
 
         const ratio = shield.current / shield.max;
+        let growth = 1;
+
+        if (shield.rebuildFlash > 0)
+        {
+            growth =
+                1 - (shield.rebuildFlash / 20);
+
+            shield.rebuildFlash--;
+        }
+
         ctx.save();
         ctx.strokeStyle = `rgba(80,180,255,${0.4 + ratio * 0.6})`;
         ctx.lineWidth = 6;
@@ -3196,8 +3266,8 @@ class Game {
             this.turret.x,
             this.turret.y,
             shield.radius,
-            Math.PI * 0.25,
-            Math.PI * 0.75
+            Math.PI*(0.5 - growth*0.25),
+            Math.PI*(0.5 + growth*0.25)
         );
         ctx.stroke();
         ctx.restore();
