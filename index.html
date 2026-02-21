@@ -206,7 +206,7 @@
         <span class="auto-mode">🤖 Infinity Tower · 基石传承</span> | 自动战斗 | 波次升级 | 遗物永久成长
     </div>
 
-    <div id="versionLabel" style="position:absolute;top:6px;right:12px;font-size:12px;color:#888;font-family:monospace;z-index:100;pointer-events:none;">v0.9.0 alpha
+    <div id="versionLabel" style="position:absolute;top:6px;right:12px;font-size:12px;color:#888;font-family:monospace;z-index:100;pointer-events:none;">v1.0.0 alpha
     </div>
 
     <div id="mainMenu" style="
@@ -239,7 +239,7 @@
     <br><br>
 
     <div style="font-size:12px;color:#777">
-    v0.9.0 a
+    v1.0.0 a
     </div>
 
     </div>
@@ -437,7 +437,16 @@ class Game {
             ATK: 0, SPEED: 0, HP: 0, ARMOR: 0, SPECIAL: 0, RANGE: 0, VIEW: 0
         };
         this.assimilationFlash = null;
+        this.lineageFlash = null;
         this.relicAssimilatedThisRun = false;
+        this.lineage = this.detectLineage();
+        const savedLineage =
+            localStorage.getItem("lineage");
+
+        if (savedLineage)
+        {
+            this.lineage = savedLineage;
+        }
         this.relicUpgradeCost = [0, 4, 6, 10, 16, 24];
 
         this.runUpgrades = {
@@ -605,6 +614,7 @@ class Game {
 
         this.applyRelics();
         this.applyRelicBias();
+        this.applyLineageBias();
         this.updateShieldStats();
         this.updateUI();
         this.updateContainerScale();
@@ -829,6 +839,28 @@ class Game {
         return maxStat;
     }
 
+    detectLineage()
+    {
+        let dominant = null;
+        let maxLevel = -1;
+
+        for (const stat in this.metaRelics)
+        {
+            const level = this.metaRelics[stat].level;
+
+            if (level > maxLevel)
+            {
+                maxLevel = level;
+                dominant = stat;
+            }
+        }
+
+        if (maxLevel <= 0)
+            return "NEUTRAL";
+
+        return dominant;
+    }
+
     assimilateRelic()
     {
         const dominant =
@@ -850,6 +882,8 @@ class Game {
 
         this.saveMetaRelics();
         this.applyRelicBias();
+        this.checkLineageTransition();
+        this.applyLineageBias();
         this.showAssimilationEffect(dominant);
     }
 
@@ -858,6 +892,14 @@ class Game {
         localStorage.setItem(
             "metaRelics",
             JSON.stringify(this.metaRelics)
+        );
+    }
+
+    saveLineage()
+    {
+        localStorage.setItem(
+            "lineage",
+            this.lineage
         );
     }
 
@@ -879,12 +921,52 @@ class Game {
         }
     }
 
+    applyLineageBias()
+    {
+        if (!this.lineage ||
+            this.lineage === "NEUTRAL")
+            return;
+
+        const level =
+            this.metaRelics[this.lineage].level;
+
+        this.nodeBias[this.lineage] =
+            level * 0.25;
+    }
+
+    checkLineageTransition()
+    {
+        const newLineage =
+            this.detectLineage();
+
+        if (newLineage !== this.lineage)
+        {
+            this.lineage = newLineage;
+
+            this.showLineageTransition();
+            this.saveLineage();
+        }
+    }
+
     showAssimilationEffect(stat)
     {
         this.assimilationFlash = {
 
             stat: stat,
             life: 120
+
+        };
+    }
+
+    showLineageTransition()
+    {
+        this.lineageFlash = {
+
+            text:
+            "Lineage Established: " +
+            this.lineage,
+
+            life: 180
 
         };
     }
@@ -913,6 +995,7 @@ class Game {
         };
         localStorage.setItem("infinityTowerSave", JSON.stringify(data));
         this.saveMeta();
+        this.saveLineage();
     }
 
     loadRun() {
@@ -2819,6 +2902,7 @@ class Game {
         this.drawGameObjects();
         this.drawRelicEffects(ctx);
         this.drawAssimilationEffect(ctx);
+        this.drawLineageFlash(ctx);
         this.drawRangeIndicators();
 
         ctx.fillStyle = "#ffd700";
@@ -2827,6 +2911,16 @@ class Game {
             "Relics: " + this.meta.relics,
             10,
             20
+        );
+
+        ctx.fillStyle = "#ffd700";
+
+        ctx.font = "14px monospace";
+
+        ctx.fillText(
+            "Lineage: " + this.lineage,
+            10,
+            40
         );
 
         // Radar：平滑展开/收起动画
@@ -2992,6 +3086,27 @@ class Game {
 
         if (this.assimilationFlash.life <= 0)
             this.assimilationFlash = null;
+    }
+
+    drawLineageFlash(ctx)
+    {
+        if (!this.lineageFlash)
+            return;
+
+        ctx.fillStyle = "#ffd700";
+
+        ctx.font = "18px monospace";
+
+        ctx.fillText(
+            this.lineageFlash.text,
+            this.turret.x - 100,
+            this.turret.y - 80
+        );
+
+        this.lineageFlash.life--;
+
+        if (this.lineageFlash.life <= 0)
+            this.lineageFlash = null;
     }
 
     drawGameObjects() {
