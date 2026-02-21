@@ -194,7 +194,7 @@
         
         <div id="victory">
             <h2>🎉 胜利!</h2>
-            <p>完成 300 波!</p>
+            <p>完成 3000 波!</p>
             <button onclick="game.restart()">再玩一次</button>
         </div>
 
@@ -212,7 +212,7 @@
         <span class="auto-mode">🤖 Infinity Tower · 基石传承</span> | 自动战斗 | 波次升级 | 遗物永久成长
     </div>
 
-    <div id="versionLabel" style="position:absolute;top:6px;right:12px;font-size:12px;color:#888;font-family:monospace;z-index:100;pointer-events:none;">v1.2.0 alpha
+    <div id="versionLabel" style="position:absolute;top:6px;right:12px;font-size:12px;color:#888;font-family:monospace;z-index:100;pointer-events:none;">v1.3.5 alpha
     </div>
 
     <div id="mainMenu" style="
@@ -247,7 +247,7 @@
     <br><br>
 
     <div style="font-size:12px;color:#777">
-    v1.2.0 a
+    v1.3.5 a
     </div>
 
     </div>
@@ -1701,8 +1701,35 @@ class Game {
     }
 
     fireWeapon_INCENDIARY() {
-        // TODO: 真实行为 - 燃烧弹，持续DoT，溅射
-        this.fireBullet();
+        if (!this.turret.target) return;
+        const effective = this.getEffectiveCombatStats();
+        const dist = Math.hypot(
+            this.turret.target.x - this.turret.x,
+            this.turret.target.y - this.turret.y
+        );
+        const allowedRange = this.getAllowedRangeForTarget(this.turret.target, effective.range);
+        if (dist > allowedRange) return;
+
+        const angle = Math.atan2(
+            this.turret.target.y - this.turret.y,
+            this.turret.target.x - this.turret.x
+        );
+        this.bullets.push({
+            x: this.turret.x,
+            y: this.turret.y,
+            vx: Math.cos(angle) * 5,
+            vy: Math.sin(angle) * 5,
+            damage: effective.atk * 0.8,
+            distance: 0,
+            maxDistance: allowedRange,
+            radius: 5,
+            speed: 5,
+            type: 'INCENDIARY',
+            color: '#ff8844',
+            isCannon: false
+        });
+        this.playShootSfx();
+        this.turret.cooldown = this.turret.stats.fireRate * 1.2 * effective.cooldownMultiplier;
     }
 
     fireWeapon_SNIPER() {
@@ -2114,6 +2141,15 @@ class Game {
                     let finalDmg = hitResult.damage;
                     
                     e.hp -= finalDmg;
+
+                    // 🔥 INCENDIARY: apply burn on hit
+                    if (b.type === 'INCENDIARY') {
+                        this.applyBurn(e);
+                        // ATK-T2-A Piercing Rounds: don't remove bullet, let it continue
+                        if (this.isModifierActive('ATK-T2-A')) {
+                            continue; // bullet keeps flying through
+                        }
+                    }
                     
                     // 子弹即将移除，先保存属性用于后续
                     const wasCannon = b.isCannon;
@@ -2226,6 +2262,9 @@ class Game {
             if (p.life <= 0) this.particles.splice(i, 1);
         }
 
+        // 🔥 Burn DoT tick
+        this.updateBurn(dt);
+
         // BIO field update
         this.bioFields.forEach(field => {
             if (field.life <= 0) return;
@@ -2279,6 +2318,85 @@ class Game {
             !enemy.dead &&
             enemy.faction === "ENEMY"
         );
+    }
+
+    // ═══════════════════════════════════════
+    // 🔥  INCENDIARY BURN SYSTEM
+    // ═══════════════════════════════════════
+
+    applyBurn(enemy) {
+        if (!enemy || enemy.dead || enemy.hp <= 0) return;
+        const burnDps      = this.turret.stats.atk * 0.35;
+        const burnDuration = 180; // 3s @ 60fps
+
+        if (!enemy.burn) {
+            enemy.burn = { dps: burnDps, timer: burnDuration, tickTimer: 0 };
+        } else {
+            // refresh duration; stack dps slightly (max 2×)
+            enemy.burn.timer = burnDuration;
+            enemy.burn.dps   = Math.min(
+                Math.max(enemy.burn.dps, burnDps) * 1.1,
+                burnDps * 2
+            );
+        }
+
+        this.createBurnEffect(enemy.x, enemy.y);
+
+        // splash ignition: nearby enemies within 40px catch fire too
+        for (const other of this.enemies) {
+            if (other === enemy || !this.isHostile(other)) continue;
+            if (Math.hypot(other.x - enemy.x, other.y - enemy.y) < 40) {
+                // weaker secondary burn, no recursion
+                if (!other.burn) {
+                    other.burn = {
+                        dps:       burnDps * 0.5,
+                        timer:     burnDuration * 0.6,
+                        tickTimer: 15
+                    };
+                    this.createBurnEffect(other.x, other.y);
+                }
+            }
+        }
+    }
+
+    updateBurn(dt) {
+        for (const enemy of this.enemies) {
+            if (!enemy.burn) continue;
+            enemy.burn.timer     -= dt;
+            enemy.burn.tickTimer -= dt;
+
+            if (enemy.burn.tickTimer <= 0) {
+                const dmg = enemy.burn.dps;
+                enemy.hp -= dmg;
+                enemy.burn.tickTimer = 30; // tick every 0.5s
+                this.spawnFloatingText(
+                    enemy.x + (Math.random() - 0.5) * 10,
+                    enemy.y - enemy.radius - 6,
+                    `-${Math.floor(dmg)}🔥`,
+                    '#ff8844',
+                    0.7
+                );
+                this.createBurnEffect(enemy.x, enemy.y);
+            }
+
+            if (enemy.burn.timer <= 0) {
+                enemy.burn = null;
+            }
+        }
+    }
+
+    createBurnEffect(x, y) {
+        const count = 2 + Math.floor(Math.random() * 2);
+        for (let i = 0; i < count; i++) {
+            this.particles.push({
+                x: x + (Math.random() - 0.5) * 8,
+                y: y + (Math.random() - 0.5) * 8,
+                vx: (Math.random() - 0.5) * 1.2,
+                vy: -0.8 - Math.random() * 1.8,
+                life: 25 + Math.floor(Math.random() * 20),
+                color: Math.random() < 0.5 ? '#ff6600' : '#ffaa22'
+            });
+        }
     }
 
     // ═══════════════════════════════════════
@@ -2488,6 +2606,9 @@ class Game {
             // assimilation state
             isConverted: false,
             conversionProgress: 0,
+
+            // burn state (INCENDIARY weapon)
+            burn: null,
 
             // snapshot storage
             originalHP: stats.hp,
@@ -3382,6 +3503,27 @@ class Game {
         }
         
         this.bullets.forEach(bullet => {
+            if (bullet.type === 'INCENDIARY') {
+                ctx.save();
+                ctx.shadowBlur  = 12;
+                ctx.shadowColor = '#ff8844';
+                ctx.fillStyle   = '#ffaa44';
+                ctx.globalAlpha = 0.95;
+                ctx.beginPath();
+                ctx.arc(bullet.x, bullet.y, bullet.radius, 0, Math.PI * 2);
+                ctx.fill();
+                // trailing ember
+                ctx.fillStyle   = '#ff5500';
+                ctx.shadowBlur  = 6;
+                ctx.globalAlpha = 0.6;
+                ctx.beginPath();
+                ctx.arc(bullet.x - bullet.vx * 1.5, bullet.y - bullet.vy * 1.5, bullet.radius * 0.6, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur  = 0;
+                ctx.restore();
+                return;
+            }
+
             ctx.fillStyle =
                 bullet.isFallback
                 ? "#6a7a8a"
@@ -3482,6 +3624,32 @@ class Game {
             // ─────────────────────────────────────────────────────
 
             this.renderTopologyOverlay(e);
+
+            // 🔥 Burn ring
+            if (e.burn) {
+                const burnRatio  = Math.min(e.burn.timer / 180, 1); // fade as timer drops
+                const flickerA   = 0.6 + 0.4 * Math.sin(Date.now() * 0.018 + e.x);
+                ctx.save();
+                ctx.strokeStyle = `rgba(255,100,0,${flickerA * burnRatio})`;
+                ctx.lineWidth   = 2.5;
+                ctx.shadowBlur  = 10;
+                ctx.shadowColor = '#ff6600';
+                ctx.beginPath();
+                ctx.arc(e.x, e.y, e.radius + 3, 0, Math.PI * 2);
+                ctx.stroke();
+                // inner ember dot
+                ctx.fillStyle = `rgba(255,200,50,${flickerA * 0.7})`;
+                ctx.shadowBlur = 6;
+                ctx.beginPath();
+                ctx.arc(
+                    e.x + Math.cos(Date.now() * 0.004) * (e.radius * 0.6),
+                    e.y + Math.sin(Date.now() * 0.004) * (e.radius * 0.6),
+                    2.5, 0, Math.PI * 2
+                );
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                ctx.restore();
+            }
 
             if (e === this.markedTarget) {
                 ctx.strokeStyle = '#ffd93d';
