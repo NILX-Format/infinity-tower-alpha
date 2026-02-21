@@ -207,7 +207,30 @@
         <span class="auto-mode">🤖 Infinity Tower · 基石传承</span> | 自动战斗 | 波次升级 | 遗物永久成长
     </div>
 
-    <div id="versionLabel" style="position:absolute;top:6px;right:12px;font-size:12px;color:#888;font-family:monospace;z-index:100;pointer-events:none;">v0.2.0 alpha
+    <div id="versionLabel" style="position:absolute;top:6px;right:12px;font-size:12px;color:#888;font-family:monospace;z-index:100;pointer-events:none;">v0.3.0 alpha
+    </div>
+
+    <div id="mainMenu" style="
+    position:absolute;
+    top:50%;
+    left:50%;
+    transform:translate(-50%,-50%);
+    text-align:center;
+    color:white;
+    font-family:monospace;
+    z-index:200;
+    ">
+
+    <h1>Infinity Tower</h1>
+
+    <button onclick="game.continueRun()">Continue Run</button>
+    <br><br>
+
+    <button onclick="game.newRun()">New Run</button>
+    <br><br>
+
+    <button onclick="game.resetProgress()">Reset Progress</button>
+
     </div>
 
 <script>
@@ -569,10 +592,36 @@ class Game {
                 }
             }
         });
+        this.showMainMenu();
+    }
+
+    showMainMenu() {
+        this.isPaused = true;
+    }
+
+    continueRun() {
         this.loadRun();
         this.updateShieldStats();
         this.updateUI();
-        this.loop();
+
+        document.getElementById("mainMenu").style.display = "none";
+
+        this.isPaused = false;
+
+        if (!this.loopStarted) {
+            this.loopStarted = true;
+            this.loop();
+        }
+    }
+
+    newRun() {
+        localStorage.removeItem("infinityTowerSave");
+        location.reload();
+    }
+
+    resetProgress() {
+        localStorage.clear();
+        location.reload();
     }
 
     // Layer check: 只在对应 weapon/topology 激活时生效
