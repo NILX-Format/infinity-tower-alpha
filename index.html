@@ -206,7 +206,7 @@
         <span class="auto-mode">🤖 Infinity Tower · 基石传承</span> | 自动战斗 | 波次升级 | 遗物永久成长
     </div>
 
-    <div id="versionLabel" style="position:absolute;top:6px;right:12px;font-size:12px;color:#888;font-family:monospace;z-index:100;pointer-events:none;">v0.8.0 alpha
+    <div id="versionLabel" style="position:absolute;top:6px;right:12px;font-size:12px;color:#888;font-family:monospace;z-index:100;pointer-events:none;">v0.9.0 alpha
     </div>
 
     <div id="mainMenu" style="
@@ -239,7 +239,7 @@
     <br><br>
 
     <div style="font-size:12px;color:#777">
-    v0.8.0 a
+    v0.9.0 a
     </div>
 
     </div>
@@ -422,6 +422,22 @@ class Game {
             RANGE:  { level: 0, count: 0 },
             VIEW:   { level: 0, count: 0 }
         };
+        const savedRelics =
+            localStorage.getItem("metaRelics");
+
+        if (savedRelics)
+        {
+            try {
+                this.metaRelics =
+                    JSON.parse(savedRelics);
+            } catch (_) {}
+        }
+
+        this.nodeBias = {
+            ATK: 0, SPEED: 0, HP: 0, ARMOR: 0, SPECIAL: 0, RANGE: 0, VIEW: 0
+        };
+        this.assimilationFlash = null;
+        this.relicAssimilatedThisRun = false;
         this.relicUpgradeCost = [0, 4, 6, 10, 16, 24];
 
         this.runUpgrades = {
@@ -588,6 +604,7 @@ class Game {
         ];
 
         this.applyRelics();
+        this.applyRelicBias();
         this.updateShieldStats();
         this.updateUI();
         this.updateContainerScale();
@@ -791,6 +808,85 @@ class Game {
             }
         }
         // 未来新增 keystone 效果只需在这里加
+    }
+
+    detectDominantTopology()
+    {
+        let maxStat = null;
+        let maxValue = -Infinity;
+
+        for (const stat in this.playerStats)
+        {
+            const value = this.playerStats[stat];
+
+            if (value > maxValue)
+            {
+                maxValue = value;
+                maxStat = stat;
+            }
+        }
+
+        return maxStat;
+    }
+
+    assimilateRelic()
+    {
+        const dominant =
+            this.detectDominantTopology();
+
+        if (!dominant) return;
+
+        if (!this.metaRelics[dominant]) {
+            this.metaRelics[dominant] = { level: 0, count: 0 };
+        }
+
+        this.metaRelics[dominant].count++;
+
+        // level increases every 3 imprints
+        this.metaRelics[dominant].level =
+            Math.floor(
+                this.metaRelics[dominant].count / 3
+            );
+
+        this.saveMetaRelics();
+        this.applyRelicBias();
+        this.showAssimilationEffect(dominant);
+    }
+
+    saveMetaRelics()
+    {
+        localStorage.setItem(
+            "metaRelics",
+            JSON.stringify(this.metaRelics)
+        );
+    }
+
+    applyRelicBias()
+    {
+        for (const stat in this.metaRelics)
+        {
+            const level =
+                this.metaRelics[stat].level;
+
+            if (level <= 0) {
+                this.nodeBias[stat] = 0;
+                continue;
+            }
+
+            // bias future node gain probability
+            this.nodeBias[stat] =
+                level * 0.15;
+        }
+    }
+
+    showAssimilationEffect(stat)
+    {
+        this.assimilationFlash = {
+
+            stat: stat,
+            life: 120
+
+        };
     }
 
     saveMeta()
@@ -1830,6 +1926,10 @@ class Game {
                         this.grantRelic();
                         this.showRelicReward();
 
+                        if (!this.relicAssimilatedThisRun) {
+                            this.assimilateRelic();
+                            this.relicAssimilatedThisRun = true;
+                        }
                         this.gameOver = true;
                         this.ui.failWave.innerHTML =
                             `Wave ${this.wave} 失败<br>总战力: ${(
@@ -2029,6 +2129,10 @@ class Game {
             this.isPaused = true;
             
             if (this.wave >= 300) {
+                if (!this.relicAssimilatedThisRun) {
+                    this.assimilateRelic();
+                    this.relicAssimilatedThisRun = true;
+                }
                 this.ui.victory.style.display = 'block';
                 this.gameOver = true;
             } else {
@@ -2714,6 +2818,7 @@ class Game {
         this.drawFog();
         this.drawGameObjects();
         this.drawRelicEffects(ctx);
+        this.drawAssimilationEffect(ctx);
         this.drawRangeIndicators();
 
         ctx.fillStyle = "#ffd700";
@@ -2866,6 +2971,27 @@ class Game {
             if (r.life <= 0)
                 this.relicEffects.splice(i,1);
         }
+    }
+
+    drawAssimilationEffect(ctx)
+    {
+        if (!this.assimilationFlash)
+            return;
+
+        ctx.fillStyle = "#ffd700";
+        ctx.font = "12px monospace";
+
+        ctx.fillText(
+            "Assimilated: " +
+            this.assimilationFlash.stat,
+            this.turret.x - 50,
+            this.turret.y - 50
+        );
+
+        this.assimilationFlash.life--;
+
+        if (this.assimilationFlash.life <= 0)
+            this.assimilationFlash = null;
     }
 
     drawGameObjects() {
