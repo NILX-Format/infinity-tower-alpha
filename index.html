@@ -1,0 +1,3139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Infinity Tower · 基石遗物</title>
+    <style>
+        :root { --ui-scale: 1.15; }
+        body {
+            margin: 0; padding: 0; background: #1a1a2e;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+            height: 100vh; font-family: 'Courier New', monospace; color: #eee; overflow: hidden;
+        }
+        #gameContainer {
+            position: relative; box-shadow: 0 0 50px rgba(0, 255, 255, 0.2);
+            transform-origin: top center;
+        }
+        canvas {
+            border: 3px solid #16213e; background: #0f0f23; display: block;
+        }
+        #ui {
+            position: absolute; top: 10px; left: 10px; right: 10px;
+            display: flex; justify-content: space-between; pointer-events: none;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+        }
+        .stat {
+            background: rgba(0,0,0,0.6); padding: 8px 15px; border-radius: 5px;
+            border: 1px solid #444; font-size: calc(14px * var(--ui-scale));
+        }
+        #hp {
+            color: #ff6b6b; font-weight: bold; position: absolute; left: 50%;
+            transform: translateX(-50%); pointer-events: none; z-index: 2;
+        }
+        #wave { color: #4ecdc4; }
+        #weaponStatus { color: #ffd93d; }
+        #enemyStatus { color: #a8f0ff; }
+        #speedControls {
+            position: absolute; bottom: 10px; left: 10px; display: flex; gap: 5px;
+        }
+        #speedControls button {
+            padding: 5px 10px; font-size: calc(12px * var(--ui-scale)); cursor: pointer;
+            background: #333; color: white; border: 1px solid #555; border-radius: 3px;
+            pointer-events: auto;
+        }
+        #speedControls button:hover { background: #444; }
+        #statusDock {
+            position: absolute; bottom: 10px; right: 10px; display: flex;
+            flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: auto;
+        }
+        #statusToggle {
+            background: rgba(0,0,0,0.6); padding: 8px 14px; border-radius: 5px;
+            border: 1px solid #444; color: #ffd93d; font-size: calc(12px * var(--ui-scale));
+            margin: 0; cursor: pointer;
+        }
+        #statusPanel {
+            width: 230px; background: rgba(0,0,0,0.88); border: 1px solid #444;
+            border-radius: 8px; padding: 10px 12px; display: none;
+        }
+        #statusPanel.open { display: block; }
+        #gameOver, #victory {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            text-align: center; display: none; background: rgba(0,0,0,0.9);
+            padding: 30px; border-radius: 10px; border: 2px solid; pointer-events: auto;
+        }
+        #gameOver { border-color: #ff6b6b; color: #ff6b6b; }
+        #victory { border-color: #4ecdc4; color: #4ecdc4; }
+        button {
+            margin-top: 15px; padding: 10px 20px; font-size: calc(16px * var(--ui-scale));
+            cursor: pointer; background: #333; color: white; border: 2px solid #555;
+            border-radius: 5px; font-family: inherit;
+        }
+        button:hover { background: #444; border-color: #777; }
+        #instructions {
+            margin-top: 12px; color: #888; font-size: calc(14px * var(--ui-scale));
+            text-align: center;
+        }
+        .auto-mode { color: #4ecdc4; font-weight: bold; }
+        #upgradePanel {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.95); border: 3px solid #4ecdc4; border-radius: 10px;
+            padding: 30px; display: none; color: #eee; text-align: center;
+            pointer-events: auto; min-width: 300px; box-shadow: 0 0 30px rgba(78,205,196,0.3);
+        }
+        #upgradeTitle { margin-top: 0; color: #4ecdc4; font-size: calc(24px * var(--ui-scale)); }
+        .stat-display { margin: 15px 0; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 5px; }
+        .stat-row { display: flex; justify-content: space-between; margin: 5px 0; font-size: calc(14px * var(--ui-scale)); }
+        #upgradeButtons { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+        #upgradeButtons button {
+            margin: 0; padding: 15px; font-size: calc(14px * var(--ui-scale));
+            background: linear-gradient(135deg, #2c3e50, #34495e); border: 1px solid #4ecdc4;
+            color: #4ecdc4; transition: all 0.3s;
+        }
+        #upgradeButtons button:hover {
+            background: linear-gradient(135deg, #34495e, #4ecdc4); color: #fff; transform: translateX(5px);
+        }
+        .weapon-indicator { margin-top: 15px; padding: 10px; background: rgba(78,205,196,0.1); border-radius: 5px; border:1px solid #4ecdc4; }
+
+        #resetProgressBtn {
+            position: absolute;
+            left: 10px;
+            bottom: 50px;
+            padding: 5px 10px;
+            font-size: 11px;
+            background: rgba(80,0,0,0.7);
+            color: #ff6b6b;
+            border: 1px solid #ff6b6b;
+            border-radius: 3px;
+            cursor: pointer;
+            pointer-events: auto;
+            margin: 0;
+            font-family: monospace;
+            z-index: 10;
+        }
+        #resetProgressBtn:hover { background: rgba(150,0,0,0.8); }
+        #relicPanel {
+            position:absolute; right:10px; top:120px; width:180px; background:rgba(0,0,0,0.6);
+            color:white; padding:10px; font-family:monospace; font-size:12px;
+            border:1px solid rgba(255,255,255,0.2); border-radius:6px; pointer-events:none;
+        }
+        #keystonePanel {
+            position:absolute; right:10px; top:280px; width:180px; background:rgba(0,0,0,0.7);
+            color:#c77dff; padding:10px; font-family:monospace; font-size:12px;
+            border:1px solid #c77dff; border-radius:6px; pointer-events:none;
+        }
+        #relicReward, #keystoneReward {
+            margin-top:10px; font-family:monospace; font-size:calc(14px * var(--ui-scale));
+            line-height:1.5; text-shadow:0 0 5px #000;
+        }
+        #keystoneReward { color:#c77dff; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="760" height="1080"></canvas>
+        
+        <div id="ui">
+            <div class="stat" id="weaponStatus">🎯 🔫 基础子弹</div>
+            <div class="stat" id="wave">🌊 Wave 1</div>
+            <div class="stat" id="enemyStatus">👾 敌人 5 / 剩余 5</div>
+        </div>
+        <div class="stat" id="hp">❤️ HP: 10/10</div>
+
+        <div id="speedControls">
+            <button onclick="game.setSpeed(1.0)">x1.0</button>
+            <button onclick="game.setSpeed(1.5)">x1.5</button>
+            <button onclick="game.setSpeed(2.0)">x2.0</button>
+            <button onclick="game.setSpeed(5.0)" style="color: #ff6b6b;">x5.0</button>
+        </div>
+        <button id="resetProgressBtn">⚠ RESET</button>
+        
+        <div id="statusDock">
+            <button id="statusToggle">Status ▼</button>
+            <div id="statusPanel">
+                <div class="stat-display" style="margin: 0;">
+                    <div class="stat-row"><span>当前武器:</span> <span id="currentWeapon" style="color: #4ecdc4;">基础子弹</span></div>
+                    <div class="stat-row"><span>ATK:</span> <span id="statAtk">1</span></div>
+                    <div class="stat-row"><span>SPEED:</span> <span id="statSpeed">1.0</span></div>
+                    <div class="stat-row"><span>HP:</span> <span id="statHp">10/10</span></div>
+                    <div class="stat-row"><span>ARMOR:</span> <span id="statArmor">0%</span></div>
+                    <div class="stat-row"><span>RANGE:</span> <span id="statRange">120</span></div>
+                    <div class="stat-row"><span>VIEW:</span> <span id="statView">150</span></div>
+                    <div class="stat-row"><span>SPECIAL:</span> <span id="statSpecial">0%</span></div>
+                </div>
+                <div id="statusResources" style="margin-top: 8px; color: #ffd93d; font-size: 12px;">🔥 ATK:0 | ⚡ SPD:0 | 🛡️ ARM:0 | 🧨 FLR:0</div>
+            </div>
+        </div>
+        
+        <!-- 遗物面板 (普通遗物) -->
+        <div id="relicPanel">
+            <b style="color:#c9d1d9;">✦ RELICS</b>
+            <div id="relicList" style="margin-top:6px;line-height:1.8;"></div>
+        </div>
+
+        <!-- 基石遗物面板 (第7步) -->
+        <div id="keystonePanel">
+            <b style="color:#c77dff;">✦ KEYSTONES</b>
+            <div id="keystoneList" style="margin-top:6px;line-height:1.8; color:#c77dff;"></div>
+        </div>
+
+        <div id="gameOver">
+            <h1>💀 炮台被摧毁!</h1>
+            <p id="failWave">Wave 1 失败</p>
+            <!-- 遗物奖励区域 (第3步) -->
+            <div id="relicReward" style="margin-top:10px; color:#ffd93d; font-family:monospace;"></div>
+            <!-- 基石奖励区域 (第4步) -->
+            <div id="keystoneReward" style="margin-top:10px; color:#c77dff; font-family:monospace;"></div>
+            <button onclick="game.restart()">重新开始</button>
+        </div>
+        
+        <div id="victory">
+            <h2>🎉 胜利!</h2>
+            <p>完成 300 波!</p>
+            <button onclick="game.restart()">再玩一次</button>
+        </div>
+
+        <div id="upgradePanel">
+            <h3 id="upgradeTitle">Wave 完成!</h3>
+            <div style="color: #ffd93d; margin: 10px 0;">选择一个升级:</div>
+            <div id="upgradeButtons"></div>
+            <div class="weapon-indicator" id="weaponHint" style="display: none;">
+                提示: 再升级 SPEED 可能解锁激光!
+            </div>
+        </div>
+    </div>
+    
+    <div id="instructions">
+        <span class="auto-mode">🤖 Infinity Tower · 基石传承</span> | 自动战斗 | 波次升级 | 遗物永久成长
+    </div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+class Game {
+    constructor() {
+        // ===== 空间拓扑定义 =====
+        this.zones = {
+            spawnTop: canvas.height * 0.15,
+            forwardTop: canvas.height * 0.20,
+            forwardBottom: canvas.height * 0.55,
+            combatBottom: canvas.height * 0.80,
+            defenseY: canvas.height * 0.85
+        };
+
+        this.ui = {
+            gameContainer: document.getElementById('gameContainer'),
+            instructions: document.getElementById('instructions'),
+            hp: document.getElementById('hp'),
+            wave: document.getElementById('wave'),
+            weaponStatus: document.getElementById('weaponStatus'),
+            enemyStatus: document.getElementById('enemyStatus'),
+            failWave: document.getElementById('failWave'),
+            gameOver: document.getElementById('gameOver'),
+            victory: document.getElementById('victory'),
+            upgradePanel: document.getElementById('upgradePanel'),
+            upgradeButtons: document.getElementById('upgradeButtons'),
+            upgradeTitle: document.getElementById('upgradeTitle'),
+            statusToggle: document.getElementById('statusToggle'),
+            statusPanel: document.getElementById('statusPanel'),
+            statusResources: document.getElementById('statusResources'),
+            currentWeapon: document.getElementById('currentWeapon'),
+            statAtk: document.getElementById('statAtk'),
+            statSpeed: document.getElementById('statSpeed'),
+            statHp: document.getElementById('statHp'),
+            statArmor: document.getElementById('statArmor'),
+            statRange: document.getElementById('statRange'),
+            statView: document.getElementById('statView'),
+            statSpecial: document.getElementById('statSpecial'),
+            weaponHint: document.getElementById('weaponHint'),
+            relicList: document.getElementById('relicList'),
+            keystoneList: document.getElementById('keystoneList'), // 第7步
+            relicReward: document.getElementById('relicReward'),
+            keystoneReward: document.getElementById('keystoneReward') // 第4步
+        };
+        this.uiState = {};
+        this.statusExpanded = false;
+
+        // ===== Audio System =====
+        this.audio = { ctx: null, master: null };
+        try {
+            this.audio.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            this.audio.master = this.audio.ctx.createGain();
+            this.audio.master.gain.value = 1.5;
+            this.audio.master.connect(this.audio.ctx.destination);
+        } catch (err) {
+            this.audio.ctx = null;
+            this.audio.master = null;
+        }
+
+        this.turret = {
+            x: canvas.width / 2,
+            y: this.zones.defenseY,
+            baseRadius: 25,
+            angle: 0,
+            cooldown: 0,
+            target: null,
+            stats: {
+                atk: 1,
+                speed: 1.0,
+                fireRate: 20,
+                hp: 10,
+                maxHp: 10,
+                armor: 0,
+                view: 150,
+                special: 0,
+                range: 120,
+                weaponType: 'BULLET'
+            },
+            // ===== Armor Shield Topology =====
+            shield: {
+                max: 0,
+                current: 0,
+                radius: 0,
+                broken: false,
+                regenCooldown: 0,
+                regenCooldownMax: 300 // 5 seconds
+            }
+        };
+
+        this.bullets = [];
+        this.enemies = [];
+        this.structures = [];
+        this.structureSpawnTimer = 0;
+        this.particles = [];
+        this.gameOver = false;
+        this.isPaused = false;
+        this.wave = 1;
+        this.enemiesSpawned = 0;
+        this.spawnTimer = 0;
+        this.wavePackets = this.generateWavePackets(this.wave);
+        this.currentPacket = 0;
+        this.packetEnemyIndex = 0;
+        this.packetTimer = 0;
+        this.enemiesToSpawn = this.getTotalEnemiesFromPackets(this.wavePackets);
+        this.laserTimer = 0;
+        this.timeScale = 1.0;
+        this.waveTransitioning = false;
+        this.markedTarget = null;
+        this.markTimer = 0;
+        this.markCooldown = 0;
+        this.markDuration = 180;
+        this.markCooldownMax = 480;
+        this.hitStopMs = 0;
+        this.superCritFlashMs = 0;
+        this.lastFrameTime = performance.now();
+        this.uiElapsedMs = 0;
+        this.collectedResources = { atk: 0, speed: 0, armor: 0, hp: 0, special: 0 };
+        this.flareCharges = 0;
+        this.flareMax = 3;
+        this.activeFlares = [];
+        this.bioFields = [];
+        this.flareConfig = {
+            radius: 140,
+            durationWaves: 1
+        };
+        this.viewCap = 600;
+        this.floatingTexts = [];
+
+        // ===== Regen Suppression System =====
+        this.regenSuppressionTimer = 0;
+        this.regenSuppressionDuration = 120; // 2 seconds @ 60fps
+        this.regenSuppressed = false;
+        this.currentRegenRate = 0;
+        this.suppressionHintCooldown = 0;
+
+        // ===== Enemy Role System =====
+        this.ENEMY_TYPES = {
+            normal: { hp: 100, speed: 1.0, damage: 1.0, radius: 15, color: '#ff6b6b', reward: 'atk', attackCooldown: 60 },
+            runner: { hp: 50, speed: 1.8, damage: 1.0, radius: 10, color: '#4ecdc4', reward: 'speed', attackCooldown: 50 },
+            tank:   { hp: 300, speed: 0.5, damage: 2.0, radius: 22, color: '#95a5a6', reward: 'armor', attackCooldown: 75 },
+            elite:  { hp: 400, speed: 0.7, damage: 2.0, radius: 18, color: '#f39c12', reward: 'special', attackCooldown: 70 },
+            boss:   { hp: 900, speed: 0.45, damage: 3.5, radius: 40, color: '#9b59b6', reward: 'special', attackCooldown: 95 },
+            scout:  { hp: 80, speed: 2.2, damage: 0.8, radius: 11, color: '#f7d794', reward: 'special', attackCooldown: 75 }
+        };
+
+        // ===== Meta Relic System =====
+        this.metaRelics = {
+            ATK:    { level: 0, count: 0 },
+            SPEED:  { level: 0, count: 0 },
+            HP:     { level: 0, count: 0 },
+            ARMOR:  { level: 0, count: 0 },
+            SPECIAL:{ level: 0, count: 0 },
+            RANGE:  { level: 0, count: 0 },
+            VIEW:   { level: 0, count: 0 }
+        };
+        this.relicUpgradeCost = [0, 4, 6, 10, 16, 24];
+
+        this.runUpgrades = {
+            ATK: 0, SPEED: 0, HP: 0, ARMOR: 0, SPECIAL: 0, RANGE: 0, VIEW: 0
+        };
+
+        // ===== Topology Weapon System =====
+        // playerStats: 独立于 runUpgrades，用于 radar topology + weapon manifestation
+        this.playerStats = {
+            ATK: 0, SPEED: 0, HP: 0, ARMOR: 0, SPECIAL: 0, RANGE: 0, VIEW: 0
+        };
+
+        // ===== Node Threshold System (L2.5 → L3 Bridge) =====
+        this.nodeThresholds = {
+            ATK:     [3, 6, 10],
+            SPEED:   [3, 6, 10],
+            HP:      [3, 6, 10],
+            ARMOR:   [3, 6, 10],
+            SPECIAL: [3, 6, 10],
+            RANGE:   [3, 6, 10],
+            VIEW:    [3, 6, 10]
+        };
+
+        this.nodeUnlocked = {
+            ATK: {}, SPEED: {}, HP: {}, ARMOR: {}, SPECIAL: {}, RANGE: {}, VIEW: {}
+        };
+
+        // ===== L4 Modifier Layer =====
+        // modifierDefs: 完整定义表，class 决定激活条件
+        this.modifierDefs = {
+            // ATK
+            'ATK-T1-A': { class: 'TOPOLOGY', node: 'ATK'  },
+            'ATK-T1-B': { class: 'GLOBAL'                  },
+            'ATK-T2-A': { class: 'WEAPON',   weapon: 'INCENDIARY' },
+            'ATK-T2-B': { class: 'GLOBAL'                  },
+            'ATK-T3-A': { class: 'GLOBAL'                  },
+            // SPEED
+            'SPD-T1-A': { class: 'GLOBAL'                  },
+            'SPD-T1-B': { class: 'WEAPON',   weapon: 'LASER' },
+            'SPD-T2-A': { class: 'GLOBAL'                  },
+            'SPD-T3-A': { class: 'GLOBAL'                  },
+            // HP
+            'HP-T1-A':  { class: 'GLOBAL'                  },
+            'HP-T2-A':  { class: 'GLOBAL'                  },
+            'HP-T3-A':  { class: 'GLOBAL'                  },
+            // ARMOR
+            'ARM-T1-A': { class: 'GLOBAL'                  },
+            'ARM-T2-A': { class: 'GLOBAL'                  },
+            'ARM-T3-A': { class: 'GLOBAL'                  },
+            // SPECIAL
+            'SPC-T1-A': { class: 'GLOBAL'                  },
+            'SPC-T2-A': { class: 'GLOBAL'                  },
+            'SPC-T3-A': { class: 'GLOBAL'                  },
+            // RANGE
+            'RNG-T1-A': { class: 'GLOBAL'                  },
+            'RNG-T2-A': { class: 'GLOBAL'                  },
+            'RNG-T3-A': { class: 'GLOBAL'                  },
+            // VIEW
+            'VIEW-T1-A':{ class: 'GLOBAL'                  },
+            'VIEW-T2-A':{ class: 'GLOBAL'                  },
+            'VIEW-T3-A':{ class: 'GLOBAL'                  },
+        };
+
+        // ownedModifiers: 仅记录"拥有"状态，不代表激活
+        this.ownedModifiers = new Set();
+
+        // modifier 运行时状态（不受 owned/active 状态影响，独立存活）
+        this.modifierState = {
+            overchargeCounter:  0,    // ATK-T1-B
+            accelerateStacks:   0,    // SPD-T1-A
+            chainCritReady:     false,// SPC-T1-A
+            reviveCooldown:     0,    // HP-T2-A
+            reviveUsed:         false,// HP-T2-A (per-run, resets each run)
+            hpRegenTimer:       0,    // HP-T1-A
+            immortalActive:     false,// HP-T3-A
+        };
+
+        // threshold 触发时暂存，wave推进等选完modifier再继续
+        this.pendingWaveAdvance = false;
+
+        this.weaponTier1Map = {
+            ATK:     'INCENDIARY',
+            SPEED:   'LASER',
+            HP:      'BIO_LAUNCHER',
+            ARMOR:   'REFLECT_SHIELD',
+            SPECIAL: 'PLASMA',
+            RANGE:   'RAILGUN',
+            VIEW:    'SNIPER'
+        };
+
+        this.weaponColors = {
+            INCENDIARY:     '#ff3b3b',
+            LASER:          '#ffd93d',
+            BIO_LAUNCHER:   '#6bcb77',
+            REFLECT_SHIELD: '#4d96ff',
+            PLASMA:         '#c77dff',
+            RAILGUN:        '#ff9f1c',
+            SNIPER:         '#00f5d4',
+            BULLET:         '#3498db'   // fallback（无 dominant node 时）
+        };
+
+        this.currentWeapon = 'BULLET';  // 初始 fallback
+        this.weaponSwitchFlash = 0;
+        this.dominanceRatioThreshold = 1.25;
+
+        // ===== Keystone System (分层结构) =====
+        // 定义表：type = WEAPON / TOPOLOGY / GLOBAL
+        this.keystoneDefs = {
+            // WEAPON-bound (40%) — 只在对应武器激活时生效
+            BEAM_OVERLOAD:       { type: 'WEAPON',   weapon: 'LASER'          },
+            SNIPER_CORE:         { type: 'WEAPON',   weapon: 'SNIPER'         },
+            INCENDIARY_CATALYST: { type: 'WEAPON',   weapon: 'INCENDIARY'     },
+            PLASMA_RESONANCE:    { type: 'WEAPON',   weapon: 'PLASMA'         },
+            // TOPOLOGY-bound (40%) — 只在对应节点 dominant 时生效
+            SPEED_RESONATOR:     { type: 'TOPOLOGY', node: 'SPEED'            },
+            ARMOR_RESONATOR:     { type: 'TOPOLOGY', node: 'ARMOR'            },
+            RANGE_AMPLIFIER:     { type: 'TOPOLOGY', node: 'RANGE'            },
+            VITAL_SURGE:         { type: 'TOPOLOGY', node: 'HP'               },
+            // GLOBAL (20%) — 永远生效，无条件
+            SIGNAL_ECHO:         { type: 'GLOBAL'                             },
+            OVERCHARGE_PROTOCOL: { type: 'GLOBAL'                             },
+            WARHEAD_REPLICATOR:  { type: 'GLOBAL'                             },
+            FORWARD_RELAY:       { type: 'GLOBAL'                             },
+        };
+
+        // 持有状态（bool map，key 与 keystoneDefs 对齐）
+        this.keystones = {};
+        for (const id in this.keystoneDefs) this.keystones[id] = false;
+
+        // 遗物追踪字段
+        this.lastRelicGained = null;
+        this.lastRelicUpgraded = false;
+        this.lastKeystoneGained = null;
+        this.relicDirty = true;
+        this.keystoneDirty = true;
+
+        // ===== Radar System =====
+        this.radarExpanded = false;
+        this.radarTransition = 0;
+        this.radarNodes = [];
+        this.hoveredNode = null;
+        this.radarPaused = false;
+
+        // ===== Weapon Snapshot (Layer 3 — Manifestation Override) =====
+        this.snapshotWeapon   = null;
+        this.snapshotTimer    = 0;
+        this.snapshotCooldown = 0;
+        this.snapshotDuration = 600; // ~10s at 60fps
+
+        this.scoutConfig = {
+            beaconRangeScale: 0.25,
+            exitMargin: 50,
+            priorityThreshold: 130
+        };
+
+        this.upgradeOptions = [
+            { key: 'atk', label: '🔥 攻击力 +1', value: 1, desc: '提升伤害输出' },
+            { key: 'speed', label: '⚡ 攻速 +0.3', value: 0.3, desc: '提升射击频率' },
+            { key: 'maxHp', label: '❤️ 生命上限 +5', value: 5, desc: '提升生存能力' },
+            { key: 'armor', label: '🛡️ 护甲 +1', value: 1, desc: '减少受到的伤害' },
+            { key: 'range', label: '📏 射程 +25', value: 25, desc: '扩大攻击范围' },
+            { key: 'view', label: '👁️ 视野 +30', value: 30, desc: '扩大可视范围' },
+            { key: 'special', label: '✨ 特殊 +1', value: 1, desc: '提升暴击率' }
+        ];
+
+        this.applyRelics();
+        this.updateShieldStats();
+        this.updateUI();
+        this.updateContainerScale();
+        canvas.addEventListener('click', (e) => this.handleClick(e));
+        canvas.addEventListener('pointerdown', () => this.resumeAudio());
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const mx = (e.clientX - rect.left) * scaleX;
+            const my = (e.clientY - rect.top) * scaleY;
+            this.hoveredNode = null;
+            for (const node of this.radarNodes) {
+                const dx = mx - node.x;
+                const dy = my - node.y;
+                if (Math.sqrt(dx * dx + dy * dy) < node.radius) {
+                    this.hoveredNode = node.name;
+                    break;
+                }
+            }
+        });
+        this.ui.statusToggle.addEventListener('click', () => this.toggleStatusPanel());
+        document.getElementById('resetProgressBtn').addEventListener('click', () => this.resetAllProgress());
+        window.addEventListener('resize', () => this.updateContainerScale());
+        window.addEventListener("keydown", e => {
+            // Debug: manual assimilation trigger
+            if (e.key === "c") {
+                const target = this.findNearestEnemy();
+                if (target) {
+                    this.convertEnemy(target);
+                    console.log("Converted enemy:", target);
+                }
+            }
+        });
+        this.loop();
+    }
+
+    // Layer check: 只在对应 weapon/topology 激活时生效
+    isKeystoneActive(id) {
+        if (!this.keystones[id]) return false;
+        const ks = this.keystoneDefs[id];
+        if (!ks) return false;
+        if (ks.type === 'GLOBAL')   return true;
+        if (ks.type === 'WEAPON')   return this.getActiveWeapon() === ks.weapon;
+        if (ks.type === 'TOPOLOGY') return this.getDominantNode() === ks.node;
+        return false;
+    }
+
+    // 向后兼容保留（内部改用 isKeystoneActive，外部旧调用不报错）
+    hasKeystone(id) {
+        return this.isKeystoneActive(id);
+    }
+
+    // ===== Weapon Snapshot Methods =====
+    getActiveWeapon() {
+        if (this.snapshotTimer > 0) return this.snapshotWeapon;
+        return this.currentWeapon;
+    }
+
+    storeSnapshot() {
+        this.snapshotWeapon = this.currentWeapon;
+    }
+
+    activateSnapshot() {
+        if (!this.snapshotWeapon || this.snapshotCooldown > 0) return;
+        this.snapshotTimer    = this.snapshotDuration;
+        this.snapshotCooldown = this.snapshotDuration + 300;
+    }
+
+    resetAllProgress() {
+        if (!confirm('Reset ALL progress?\nThis cannot be undone.')) return;
+
+        localStorage.removeItem('metaRelics');
+        localStorage.removeItem('keystones');
+        localStorage.removeItem('snapshotData');
+
+        for (let stat in this.metaRelics) {
+            this.metaRelics[stat].level = 0;
+            this.metaRelics[stat].count = 0;
+        }
+        for (let id in this.keystones) this.keystones[id] = false;
+
+        this.snapshotWeapon   = null;
+        this.snapshotTimer    = 0;
+        this.snapshotCooldown = 0;
+
+        this.ownedModifiers.clear();
+        this.modifierState.overchargeCounter = 0;
+        this.modifierState.chainCritReady    = false;
+        this.modifierState.reviveUsed        = false;
+        this.modifierState.reviveCooldown    = 0;
+        this.modifierState.hpRegenTimer      = 0;
+        for (const stat in this.nodeUnlocked) this.nodeUnlocked[stat] = {};
+
+        this.relicDirty   = true;
+        this.keystoneDirty = true;
+
+        alert('Progress reset complete.');
+    }
+
+    // 第3步: 授予 keystone
+    grantKeystone(id) {
+        if (this.keystones[id]) return;
+        this.keystones[id] = true;
+        this.lastKeystoneGained = id;
+        this.keystoneDirty = true;
+        this.showKeystoneReward();
+        this.updateKeystoneUI();
+        try { localStorage.setItem('keystones', JSON.stringify(this.keystones)); } catch(e) {}
+        console.log(`[Keystone] 获得 ${id}`);
+    }
+
+    // 第4步: 显示 keystone 奖励
+    showKeystoneReward() {
+        if (!this.lastKeystoneGained) return;
+        this.ui.keystoneReward.innerHTML =
+            "✨ Keystone Acquired<br>" +
+            this.lastKeystoneGained.replace(/_/g, ' ');
+    }
+
+    // 更新 Keystone UI（显示分层标签）
+    updateKeystoneUI() {
+        if (!this.keystoneDirty) return;
+        this.keystoneDirty = false;
+        const typeColors = { WEAPON: '#ff9f1c', TOPOLOGY: '#4d96ff', GLOBAL: '#c77dff' };
+        const typeLabels = { WEAPON: 'W', TOPOLOGY: 'T', GLOBAL: 'G' };
+        let html = '';
+        for (let id in this.keystones) {
+            if (!this.keystones[id]) continue;
+            const def = this.keystoneDefs[id];
+            const tc  = typeColors[def?.type] || '#888';
+            const tl  = typeLabels[def?.type] || '?';
+            const active = this.isKeystoneActive(id);
+            const opacity = active ? '1' : '0.4';
+            html += `<span style="opacity:${opacity}">` +
+                    `<span style="color:${tc};font-size:9px">[${tl}]</span> ` +
+                    `${id.replace(/_/g, ' ')}</span><br>`;
+        }
+        if (html === '') html = "<span style='color:#555'>无</span>";
+        this.ui.keystoneList.innerHTML = html;
+    }
+
+    // 统一敌人死亡 Hook，所有 keystone/relic 触发都集中在这里
+    onEnemyKilled(enemy) {
+        if (enemy.type === 'SCOUT' && this.hasKeystone('SIGNAL_ECHO')) {
+            this.turret.stats.view = Math.min(this.viewCap, this.turret.stats.view + 5);
+        }
+        // 未来新增 keystone 效果只需在这里加
+    }
+
+    getTotalEnemiesFromPackets(packets) {
+        return packets.reduce((sum, p) => sum + (p.count || 0), 0);
+    }
+
+    msToTicks(ms) {
+        return Math.max(1, Math.floor(ms / 16.6667));
+    }
+
+    getRegenRate() {
+        return 0.5 + (this.playerStats.HP || 0) * 0.2;
+    }
+
+    getAllowedRangeForTarget(target, baseRange) {
+        let allowed = baseRange;
+        if (target && target.state === "ATTACKING_SHIELD") {
+            allowed = Math.max(
+                allowed,
+                this.turret.shield.radius + (target.radius || 0) + 12
+            );
+        }
+        return allowed;
+    }
+
+    updateShieldStats() {
+        const armorLevel = this.turret.stats.armor || 0;
+        const shield = this.turret.shield;
+        const prevMax = shield.max;
+
+        shield.max = Math.max(0, armorLevel * 12);
+        shield.radius = this.turret.baseRadius + 40 + armorLevel * 3;
+        shield.regenCooldownMax = Math.max(120, 300 - armorLevel * 15);
+
+        if (shield.max <= 0) {
+            shield.current = 0;
+            shield.broken = true;
+            shield.regenCooldown = 0;
+            return;
+        }
+
+        if (prevMax <= 0 && shield.max > 0) {
+            shield.broken = false;
+            shield.current = shield.max;
+            shield.regenCooldown = 0;
+            return;
+        }
+
+        if (!shield.broken) shield.current = shield.max;
+        else shield.current = Math.min(shield.current, shield.max);
+    }
+
+    createShieldBreakEffect(x, y) {
+        this.createExplosion(x, y, '#44aaff', 16);
+        this.spawnFloatingText(x, y - 36, 'SHIELD BREAK', '#44aaff', 0.9);
+    }
+
+    createShieldRestoreEffect(x, y) {
+        this.createExplosion(x, y, '#7ad3ff', 12);
+        this.spawnFloatingText(x, y - 36, 'SHIELD RESTORED', '#7ad3ff', 0.9);
+    }
+
+    spawnFloatingText(x, y, text, color = "#ffffff", scale = 1) {
+        this.floatingTexts.push({
+            x,
+            y,
+            text,
+            color,
+            scale,
+            life: 45,
+            maxLife: 45
+        });
+    }
+
+    generateWavePackets(waveNumber) {
+        const packets = [];
+        const eliteCount = Math.floor(waveNumber / 5);
+
+        if (waveNumber % 10 === 0) {
+            packets.push({ type: "boss", count: 1, interval: 0 });
+        }
+
+        packets.push({
+            type: "normal",
+            count: 6 + waveNumber,
+            interval: 180
+        });
+
+        if (waveNumber >= 4) {
+            packets.push({
+                type: "runner",
+                count: 2 + Math.floor(waveNumber / 4),
+                interval: 150
+            });
+        }
+
+        if (eliteCount > 0) {
+            packets.push({
+                type: "elite",
+                count: eliteCount,
+                interval: 800
+            });
+        }
+
+        if (waveNumber >= 6) {
+            packets.push({
+                type: "tank",
+                count: 1 + Math.floor(waveNumber / 6),
+                interval: 240
+            });
+        }
+
+        return packets;
+    }
+
+    getEnemiesForWave() {
+        return this.getTotalEnemiesFromPackets(this.generateWavePackets(this.wave));
+    }
+
+    spawnBeacon() {
+        const x = Math.random() * canvas.width;
+        const y =
+            this.zones.forwardTop +
+            Math.random() * (this.zones.forwardBottom - this.zones.forwardTop);
+
+        this.structures.push({
+            x,
+            y,
+            size: 20,
+            range: 120,
+            hp: 40 + this.wave * 10,
+            maxHp: 40 + this.wave * 10,
+            rotation: 0,
+            pulse: Math.random() * Math.PI * 2,
+            type: 'BEACON'
+        });
+    }
+
+    getEffectiveView() {
+        return Math.min(this.turret.stats.view, this.viewCap);
+    }
+
+    isPositionRevealed(x, y) {
+        const inView = Math.hypot(x - this.turret.x, y - this.turret.y) <= this.getEffectiveView();
+        if (inView) return true;
+
+        return this.activeFlares.some(flare => Math.hypot(x - flare.x, y - flare.y) <= flare.radius);
+    }
+
+    launchFlare(x, y) {
+        if (this.flareCharges <= 0) return false;
+        this.flareCharges--;
+
+        let radius = this.flareConfig.radius;
+        let durationWaves = this.flareConfig.durationWaves;
+
+        // Hook #4: FORWARD_RELAY 增强照明弹
+        if (this.hasKeystone("FORWARD_RELAY")) {
+            radius *= 2;
+            durationWaves *= 1.5;
+        }
+
+        this.activeFlares.push({
+            x,
+            y,
+            radius: radius,
+            expiresAtWave: this.wave + Math.ceil(durationWaves)
+        });
+
+        this.createExplosion(this.turret.x, this.turret.y, '#ffeaa7', 8);
+        this.createExplosion(x, y, '#fff3b0', 20);
+        this.playTone(520, 0.12, 'triangle', 0.06, 260);
+        return true;
+    }
+
+    findNearestBeacon(enemy) {
+        let nearest = null;
+        let minDist = Infinity;
+        this.structures.forEach(s => {
+            if (s.type !== 'BEACON' || s.hp <= 0) return;
+            const d = Math.hypot(enemy.x - s.x, enemy.y - s.y);
+            if (d < minDist) {
+                minDist = d;
+                nearest = s;
+            }
+        });
+        return { beacon: nearest, dist: minDist };
+    }
+
+    handleScoutDefeat(enemy) {
+        if (enemy.type === 'BOSS') {
+            this.flareCharges = Math.min(this.flareMax, this.flareCharges + 1);
+            return;
+        }
+        if (enemy.type === 'SCOUT' && enemy.canDropFlare && Math.random() <= 0.5) {
+            this.flareCharges = Math.min(this.flareMax, this.flareCharges + 1);
+        }
+    }
+
+    updateScoutBehavior(enemy, dt) {
+        const { beacon: nearestBeacon, dist } = this.findNearestBeacon(enemy);
+        if (nearestBeacon) enemy.state = 'SEEK_BEACON';
+        else enemy.state = 'PATROL_FORWARD_ZONE';
+
+        const minY = this.zones.forwardTop - this.scoutConfig.exitMargin;
+        const maxY = this.zones.forwardBottom;
+
+        if (enemy.state === 'SEEK_BEACON' && nearestBeacon) {
+            const dx = nearestBeacon.x - enemy.x;
+            const dy = nearestBeacon.y - enemy.y;
+            const len = Math.hypot(dx, dy) || 1;
+            const moveSpeed = enemy.speed * (enemy.speedMultiplier || 1) * 0.5 * dt;
+            enemy.x += (dx / len) * moveSpeed;
+            enemy.y += (dy / len) * moveSpeed;
+
+            if (dist <= nearestBeacon.range) {
+                enemy.state = 'REINFORCE_BEACON';
+            }
+        }
+
+        if (enemy.state === 'PATROL_FORWARD_ZONE') {
+            const tx = canvas.width * 0.5;
+            const ty = (this.zones.forwardTop + this.zones.forwardBottom) * 0.5;
+            const dx = tx - enemy.x;
+            const dy = ty - enemy.y;
+            const len = Math.hypot(dx, dy) || 1;
+            const moveSpeed = enemy.speed * (enemy.speedMultiplier || 1) * 0.45 * dt;
+            enemy.x += (dx / len) * moveSpeed;
+            enemy.y += (dy / len) * moveSpeed;
+        }
+
+        if (enemy.y >= this.zones.forwardTop) {
+            enemy.hasEnteredForwardZone = true;
+        }
+
+        if (
+            enemy.hasEnteredForwardZone &&
+            enemy.y < this.zones.forwardTop - this.scoutConfig.exitMargin
+        ) {
+            return { remove: true, reason: 'despawn' };
+        }
+
+        enemy.y = Math.max(minY, Math.min(maxY, enemy.y));
+
+        if (enemy.state === 'REINFORCE_BEACON' && nearestBeacon) {
+            nearestBeacon.maxHp += enemy.hp;
+            nearestBeacon.hp += enemy.hp;
+            nearestBeacon.range += enemy.hp * this.scoutConfig.beaconRangeScale;
+            return { remove: true, reason: 'reinforce' };
+        }
+
+        return { remove: false, reason: null };
+    }
+
+    setSpeed(speed) {
+        this.resumeAudio();
+        this.timeScale = speed;
+        console.log("游戏速度:", speed + "x");
+    }
+
+    toggleStatusPanel() {
+        this.statusExpanded = !this.statusExpanded;
+        this.radarExpanded = this.statusExpanded;
+        this.ui.statusPanel.classList.toggle('open', this.statusExpanded);
+        this.ui.statusToggle.textContent = this.statusExpanded ? 'Status ▲' : 'Status ▼';
+
+        // 展开雷达时暂停游戏（仅在正常游戏中，不影响波次结算暂停）
+        if (this.radarExpanded) {
+            this.radarPaused = true;
+            this.isPaused = true;
+        } else {
+            this.radarPaused = false;
+            // 只有是雷达引起的暂停才恢复，不影响 upgradePanel 等其他暂停
+            if (!this.waveTransitioning) this.isPaused = false;
+        }
+    }
+
+    updateContainerScale() {
+        const viewportW = window.innerWidth;
+        const viewportH = window.innerHeight;
+        const instructionH = this.ui.instructions ? this.ui.instructions.offsetHeight : 32;
+        const horizontalPadding = 64;
+        const topPadding = 16;
+        const bottomPadding = 20;
+        const availW = Math.max(320, viewportW - horizontalPadding);
+        const availH = Math.max(320, viewportH - instructionH - topPadding - bottomPadding);
+        const fitScale = Math.min(availW / canvas.width, availH / canvas.height);
+        const scale = Math.min(1, fitScale * 0.96);
+        this.ui.gameContainer.style.transform = `scale(${scale})`;
+    }
+
+    resumeAudio() {
+        if (!this.audio.ctx) return;
+        if (this.audio.ctx.state === 'suspended') {
+            this.audio.ctx.resume().catch(() => {});
+        }
+    }
+
+    playTone(freq, duration, type = 'square', gain = 0.06, endFreq = null) {
+        if (!this.audio.ctx || !this.audio.master) return;
+        if (this.audio.ctx.state !== 'running') return;
+
+        const now = this.audio.ctx.currentTime;
+        const osc = this.audio.ctx.createOscillator();
+        const amp = this.audio.ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, now);
+        if (endFreq !== null) {
+            osc.frequency.exponentialRampToValueAtTime(Math.max(30, endFreq), now + duration);
+        }
+
+        amp.gain.setValueAtTime(0.0001, now);
+        amp.gain.exponentialRampToValueAtTime(gain, now + 0.01);
+        amp.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+        osc.connect(amp);
+        amp.connect(this.audio.master);
+        osc.start(now);
+        osc.stop(now + duration + 0.02);
+    }
+
+    playShootSfx() {
+        const type = this.turret.stats.weaponType;
+        if (type === 'LASER') {
+            this.playTone(900, 0.09, 'sawtooth', 0.05, 380);
+        } else if (type === 'CANNON') {
+            this.playTone(120, 0.12, 'square', 0.08, 70);
+        } else {
+            this.playTone(620, 0.05, 'square', 0.04, 420);
+        }
+    }
+
+    playCritSfx(radiusScale = 1) {
+        const gainBoost = Math.min(1.4, radiusScale);
+        this.playTone(720, 0.05, 'triangle', 0.045 * gainBoost, 980);
+    }
+
+    applySoftCap(rawCritChance) {
+        const knee = 0.35;
+        const maxCrit = 0.8;
+        if (rawCritChance <= knee) return rawCritChance;
+        const overflow = rawCritChance - knee;
+        const compressed = (1 - Math.exp(-overflow * 2.2)) * (maxCrit - knee);
+        return Math.min(maxCrit, knee + compressed);
+    }
+
+    computeCritStats(special) {
+        const baseCritChance = 0.05;
+        const rawCritChance = baseCritChance + special * 0.02;
+        const critChance = this.applySoftCap(rawCritChance);
+        const critMultiplier = 2.0 + special * 0.05;
+        const critRadiusScale = 1.0 + special * 0.03;
+        return { critChance, critMultiplier, critRadiusScale };
+    }
+
+    applyDamageWithCrit(baseDamage, target) {
+        const special = this.turret.stats.special || 0;
+        const crit = this.computeCritStats(special);
+
+        // ATK-T1-B: Overcharge Protocol — 每第4次攻击 ×3.0（GLOBAL）
+        let overchargeBoost = 1;
+        if (this.isModifierActive('ATK-T1-B')) {
+            this.modifierState.overchargeCounter++;
+            if (this.modifierState.overchargeCounter >= 4) {
+                this.modifierState.overchargeCounter = 0;
+                overchargeBoost = 3;
+                this.createExplosion(target.x, target.y, '#ff3b3b', 14);
+            }
+        }
+
+        // ATK-T2-B: Execution Protocol — HP < 20% 直接处决（GLOBAL）
+        if (this.isModifierActive('ATK-T2-B') && target.hp !== undefined && target.maxHp !== undefined) {
+            if (target.hp / target.maxHp < 0.20) {
+                return { damage: target.hp + 1, isCrit: true, radiusScale: 1.5, execution: true };
+            }
+        }
+
+        // SPC-T2-A: Probability Distortion — 暴击率翻倍（GLOBAL）
+        const critChance = this.isModifierActive('SPC-T2-A')
+            ? Math.min(0.95, crit.critChance * 2)
+            : crit.critChance;
+
+        const isCrit = Math.random() < critChance;
+
+        if (!isCrit) {
+            this.modifierState.chainCritReady = false;
+            return { damage: baseDamage * overchargeBoost, isCrit: false, radiusScale: 1 };
+        }
+
+        const damage = baseDamage * crit.critMultiplier * overchargeBoost;
+        const particles = Math.max(8, Math.round(8 * crit.critRadiusScale));
+        this.createExplosion(target.x, target.y, '#ffd93d', particles);
+        this.playCritSfx(crit.critRadiusScale);
+
+        const stopMs = Math.min(80, 30 + (crit.critRadiusScale - 1) * 40);
+        this.hitStopMs = Math.max(this.hitStopMs, stopMs);
+        if (crit.critMultiplier >= 2.8) this.superCritFlashMs = 140;
+
+        // SPC-T1-A: Critical Cascade — 暴击触发 radius:60 二次爆炸（GLOBAL）
+        if (this.isModifierActive('SPC-T1-A')) {
+            this.enemies.forEach(nearby => {
+                if (nearby === target || nearby.hp <= 0) return;
+                if (Math.hypot(nearby.x - target.x, nearby.y - target.y) < 60) {
+                    nearby.hp -= baseDamage * 0.5;
+                }
+            });
+            this.createExplosion(target.x, target.y, '#c77dff', 8);
+        }
+
+        // SPD-T2-A: Time Fracture — 暴击后冷却归零（GLOBAL）
+        if (this.isModifierActive('SPD-T2-A')) {
+            this.turret.cooldown = 0;
+        }
+
+        // Keystone: OVERCHARGE_PROTOCOL
+        if (this.isKeystoneActive('OVERCHARGE_PROTOCOL') && this.activeFlares.length < 10) {
+            this.activeFlares.push({ x: target.x, y: target.y, radius: 120, expiresAtWave: this.wave + 2 });
+        }
+
+        return { damage, isCrit: true, radiusScale: crit.critRadiusScale };
+    }
+
+    getEffectiveCombatStats() {
+        const s = this.turret.stats;
+        const baseATK = s.atk;
+        const baseSPEED = s.speed;
+        const baseRANGE = s.range;
+        const baseSPECIAL = s.special || 0;
+
+        if (s.weaponType === 'CANNON') {
+            return {
+                atk: baseATK + baseSPEED * 0.5,
+                speed: Math.max(0.1, baseSPEED * 0.5),
+                range: baseRANGE * 1.2,
+                splashRadius: 40 + baseSPECIAL * 2
+            };
+        }
+
+        return {
+            atk: baseATK,
+            speed: baseSPEED,
+            range: baseRANGE,
+            splashRadius: 0
+        };
+    }
+
+    fireBullet() {
+        if (!this.turret.target) return;
+        const effective = this.getEffectiveCombatStats();
+        const dist = Math.hypot(
+            this.turret.target.x - this.turret.x,
+            this.turret.target.y - this.turret.y
+        );
+        const allowedRange = this.getAllowedRangeForTarget(this.turret.target, effective.range);
+        if (dist > allowedRange) return;
+        
+        const angle = Math.atan2(this.turret.target.y - this.turret.y, this.turret.target.x - this.turret.x);
+        this.bullets.push({
+            x: this.turret.x, y: this.turret.y,
+            vx: Math.cos(angle) * 7, vy: Math.sin(angle) * 7,
+            damage: effective.atk,
+            distance: 0, maxDistance: allowedRange,
+            radius: 3,
+            speed: 7,
+            isCannon: false
+        });
+        this.playShootSfx();
+        this.turret.cooldown = this.turret.stats.fireRate / effective.speed;
+    }
+
+    fireLaser() {
+        if (!this.turret.target) return;
+        const effective = this.getEffectiveCombatStats();
+        const laserDmg = effective.atk * effective.speed * 0.3;
+        const laserHit = this.applyDamageWithCrit(laserDmg, this.turret.target);
+        this.turret.target.hp -= laserHit.damage;
+        
+        this.createExplosion(this.turret.target.x, this.turret.target.y, '#4ecdc4', 2);
+        this.playShootSfx();
+        this.turret.cooldown = 6;
+        this.laserTimer = 5;
+    }
+
+    fireCannon() {
+        if (!this.turret.target) return;
+        const effective = this.getEffectiveCombatStats();
+        const dist = Math.hypot(
+            this.turret.target.x - this.turret.x,
+            this.turret.target.y - this.turret.y
+        );
+        const allowedRange = this.getAllowedRangeForTarget(this.turret.target, effective.range);
+        if (dist > allowedRange) return;
+        
+        const angle = Math.atan2(this.turret.target.y - this.turret.y, this.turret.target.x - this.turret.x);
+        this.bullets.push({
+            x: this.turret.x, y: this.turret.y,
+            vx: Math.cos(angle) * 4, vy: Math.sin(angle) * 4,
+            damage: effective.atk * 3,
+            distance: 0, maxDistance: allowedRange * 1.5,
+            radius: 8, isCannon: true,
+            speed: 4,
+            splashRadius: effective.splashRadius,
+            weaponType: 'CANNON'
+        });
+        this.playShootSfx();
+        this.turret.cooldown = (this.turret.stats.fireRate * 3) / effective.speed;
+    }
+
+    autoShoot() {
+        if (this.turret.cooldown > 0 || !this.turret.target) return;
+        const effective = this.getEffectiveCombatStats();
+        const dist = Math.hypot(
+            this.turret.target.x - this.turret.x,
+            this.turret.target.y - this.turret.y
+        );
+        const allowedRange = this.getAllowedRangeForTarget(this.turret.target, effective.range);
+        if (dist > allowedRange) return;
+
+        // ===== Weapon Dispatcher — Layer 3 aware =====
+        switch (this.getActiveWeapon()) {
+            case 'LASER':           this.fireWeapon_LASER();           break;
+            case 'INCENDIARY':      this.fireWeapon_INCENDIARY();      break;
+            case 'SNIPER':          this.fireWeapon_SNIPER();          break;
+            case 'PLASMA':          this.fireWeapon_PLASMA();          break;
+            case 'RAILGUN':         this.fireWeapon_RAILGUN();         break;
+            case 'BIO_LAUNCHER':    this.fireWeapon_BIO_LAUNCHER();    break;
+            case 'REFLECT_SHIELD':  this.fireWeapon_REFLECT_SHIELD();  break;
+            default:                this.fireBullet();                  break;
+        }
+    }
+
+    // ===== Weapon Stubs（各自独立，之后逐个替换为真实行为）=====
+
+    fireWeapon_LASER() {
+        // TODO: 真实行为 - 持续光束，穿透，高频
+        this.fireLaser();
+    }
+
+    fireWeapon_INCENDIARY() {
+        // TODO: 真实行为 - 燃烧弹，持续DoT，溅射
+        this.fireBullet();
+    }
+
+    fireWeapon_SNIPER() {
+        // TODO: 真实行为 - 超远射程，高暴击，穿透单体
+        this.fireBullet();
+    }
+
+    fireWeapon_PLASMA() {
+        // TODO: 真实行为 - 高暴击触发连锁爆炸
+        this.fireBullet();
+    }
+
+    fireWeapon_RAILGUN() {
+        // TODO: 真实行为 - 穿透直线所有敌人，射程加成
+        this.fireBullet();
+    }
+
+    fireWeapon_BIO_LAUNCHER() {
+        this.updateBioLauncher();
+    }
+
+    // ===== BIO_LAUNCHER Manifestation =====
+    updateBioLauncher() {
+
+        if (!this.lastBioFire)
+            this.lastBioFire = 0;
+
+        const now = performance.now();
+
+        const cooldown = 1200; // ms
+
+        if (now - this.lastBioFire < cooldown)
+            return;
+
+        this.lastBioFire = now;
+
+        // target nearest enemy
+        const target = this.findNearestEnemy();
+
+        if (!target)
+            return;
+
+        this.createBioField(target.x, target.y);
+
+    }
+
+    fireWeapon_REFLECT_SHIELD() {
+        // 被动武器：不主动开火，伤害反弹在 onHit 处理
+        // 但仍需重置 cooldown 防止锁死
+        this.turret.cooldown = this.turret.stats.fireRate;
+    }
+
+    handleClick(e) {
+        if (this.gameOver || this.isPaused) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const mx = (e.clientX - rect.left) * scaleX;
+        const my = (e.clientY - rect.top) * scaleY;
+
+        let closest = null;
+        let closestDist = 30;
+
+        if (this.markCooldown <= 0) {
+            this.enemies.forEach(enemy => {
+                const d = Math.hypot(enemy.x - mx, enemy.y - my);
+                if (d < closestDist) {
+                    closest = enemy;
+                    closestDist = d;
+                }
+            });
+        }
+
+        if (closest) {
+            this.markedTarget = closest;
+            this.markTimer = this.markDuration;
+            this.markCooldown = this.markCooldownMax;
+            this.createExplosion(closest.x, closest.y, '#ffd93d', 15);
+            return;
+        }
+
+        if (!this.isPositionRevealed(mx, my)) {
+            this.launchFlare(mx, my);
+        }
+    }
+
+    update(dt) {
+        if (this.gameOver || this.isPaused) return;
+
+        if (this.laserTimer > 0) this.laserTimer = Math.max(0, this.laserTimer - dt);
+        if (this.turret.cooldown > 0) this.turret.cooldown = Math.max(0, this.turret.cooldown - dt);
+        if (this.snapshotTimer > 0)    this.snapshotTimer    = Math.max(0, this.snapshotTimer    - dt);
+        if (this.snapshotCooldown > 0) this.snapshotCooldown = Math.max(0, this.snapshotCooldown - dt);
+        if (this.modifierState.reviveCooldown > 0)
+            this.modifierState.reviveCooldown = Math.max(0, this.modifierState.reviveCooldown - dt);
+
+        // ===== Update Regen Suppression =====
+        if (this.regenSuppressionTimer > 0) {
+            this.regenSuppressionTimer = Math.max(0, this.regenSuppressionTimer - dt);
+            this.regenSuppressed = true;
+        } else {
+            this.regenSuppressed = false;
+        }
+
+        if (this.suppressionHintCooldown > 0) {
+            this.suppressionHintCooldown = Math.max(0, this.suppressionHintCooldown - dt);
+        }
+
+        const shield = this.turret.shield;
+        if (shield.broken && shield.max > 0) {
+            shield.regenCooldown = Math.max(0, shield.regenCooldown - dt);
+            if (shield.regenCooldown <= 0) {
+                shield.broken = false;
+                shield.current = shield.max;
+                this.createShieldRestoreEffect(this.turret.x, this.turret.y);
+            }
+        }
+
+        const deltaTime = dt / 60;
+        let regenRate = this.getRegenRate();
+        if (this.regenSuppressed) regenRate *= 0.5;
+        this.currentRegenRate = regenRate;
+
+        this.turret.stats.hp = Math.min(
+            this.turret.stats.maxHp,
+            this.turret.stats.hp + regenRate * deltaTime
+        );
+
+        // HP-T1-A: Regeneration — 每3秒回1 HP（GLOBAL）
+        if (this.isModifierActive('HP-T1-A')) {
+            this.modifierState.hpRegenTimer += dt;
+            if (this.modifierState.hpRegenTimer >= 180) { // 180 frames ≈ 3s at 60fps
+                this.modifierState.hpRegenTimer = 0;
+                this.turret.stats.hp = Math.min(this.turret.stats.maxHp, this.turret.stats.hp + 1);
+            }
+        }
+        if (this.markTimer > 0) {
+            this.markTimer = Math.max(0, this.markTimer - dt);
+            if (this.markTimer <= 0) this.markedTarget = null;
+        }
+        if (this.markCooldown > 0) {
+            this.markCooldown = Math.max(0, this.markCooldown - dt);
+        }
+        if (this.markedTarget && !this.enemies.includes(this.markedTarget) && !this.structures.includes(this.markedTarget)) {
+            this.markedTarget = null;
+            this.markTimer = 0;
+        }
+        this.activeFlares = this.activeFlares.filter(flare => flare.expiresAtWave > this.wave);
+
+        // Beacon生成控制
+        this.structureSpawnTimer += dt;
+        if (this.structureSpawnTimer > 600) {
+            this.structureSpawnTimer = 0;
+            if (this.structures.length < 2) {
+                this.spawnBeacon();
+            }
+        }
+
+        // 重置强化状态
+        this.enemies.forEach(enemy => {
+            enemy.speedMultiplier = 1.0;
+            enemy.targetType = 'enemy';
+        });
+
+        // Beacon 光场强化
+        this.structures.forEach(s => {
+            if (s.type !== 'BEACON') return;
+            s.rotation += 0.01 * dt;
+            s.pulse += 0.05 * dt;
+            s.targetType = 'structure';
+
+            this.enemies.forEach(e => {
+                const dx = e.x - s.x;
+                const dy = e.y - s.y;
+                if (Math.abs(dx) < s.range && Math.abs(dy) < s.range) {
+                    e.speedMultiplier = Math.max(e.speedMultiplier, 1.6);
+                }
+            });
+        });
+
+        // 寻找目标
+        let target = null;
+
+        // priority 1: enemies attacking tower
+        target = this.enemies.find(e =>
+            !e.dead &&
+            e.faction === "ENEMY" &&
+            (e.state === "ATTACKING" || e.state === "ATTACKING_SHIELD")
+        );
+
+        // priority 2: nearest enemy
+        if (!target)
+            target = this.findNearestEnemy();
+
+        this.turret.target = target;
+
+        // 瞄准并射击
+        if (this.turret.target) {
+            const targetAngle = Math.atan2(
+                this.turret.target.y - this.turret.y,
+                this.turret.target.x - this.turret.x
+            );
+            this.turret.angle += (targetAngle - this.turret.angle) * 0.2;
+            this.autoShoot();
+        }
+
+        // 敌人生成（Wave Packet System）
+        if (this.currentPacket < this.wavePackets.length) {
+            const packet = this.wavePackets[this.currentPacket];
+            this.packetTimer--;
+
+            if (this.packetTimer <= 0) {
+                this.spawnEnemy(packet.type);
+                this.packetEnemyIndex++;
+
+                if (this.packetEnemyIndex >= packet.count) {
+                    this.currentPacket++;
+                    this.packetEnemyIndex = 0;
+                    if (this.currentPacket < this.wavePackets.length) {
+                        this.packetTimer = this.msToTicks(2000); // packet 间隔
+                    }
+                } else {
+                    this.packetTimer = this.msToTicks(packet.interval);
+                }
+            }
+        }
+
+        // 移动与碰撞
+        for (let i = this.enemies.length - 1; i >= 0; i--) {
+            const e = this.enemies[i];
+
+            // converted unit lifetime expired → silent removal
+            if (e.dead) {
+                if (this.markedTarget === e) { this.markedTarget = null; this.markTimer = 0; }
+                this.enemies.splice(i, 1);
+                continue;
+            }
+
+            if (e.hp <= 0) {
+                this.onEnemyKilled(e);
+                this.handleScoutDefeat(e);
+                this.collectedResources[e.reward] = (this.collectedResources[e.reward] || 0) + 1;
+                this.createExplosion(e.x, e.y, e.color, 8);
+                if (this.markedTarget === e) {
+                    this.markedTarget = null;
+                    this.markTimer = 0;
+                }
+                this.enemies.splice(i, 1);
+                continue;
+            }
+            const dx = this.turret.x - e.x, dy = this.turret.y - e.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist < 0.001) continue;
+
+            if (e.type === 'SCOUT') {
+                const scoutResult = this.updateScoutBehavior(e, dt);
+                if (scoutResult.remove) {
+                    if (this.markedTarget === e) {
+                        this.markedTarget = null;
+                        this.markTimer = 0;
+                    }
+                    if (scoutResult.reason === 'reinforce') {
+                        this.createExplosion(e.x, e.y, '#ffd93d', 10);
+                    }
+                    this.enemies.splice(i, 1);
+                    continue;
+                }
+            } else {
+                // ===== FACTION-BASED MOVEMENT =====
+                let targetX, targetY;
+                if (e.faction === "PLAYER") {
+                    // allied → target nearest hostile enemy
+                    const hostile = this.findNearestHostile(e);
+                    if (!hostile) continue;
+                    targetX = hostile.x;
+                    targetY = hostile.y;
+                } else {
+                    // hostile → target turret
+                    targetX = this.turret.x;
+                    targetY = this.turret.y;
+                }
+                const fdx = targetX - e.x;
+                const fdy = targetY - e.y;
+                const fdist = Math.hypot(fdx, fdy);
+                if (fdist < 0.001) continue;
+
+                // state: shield contact first, then core contact
+                if (e.faction !== "PLAYER") {
+                    const shield = this.turret.shield;
+                    const distToTurret = Math.hypot(this.turret.x - e.x, this.turret.y - e.y);
+
+                    if (!shield.broken && shield.current > 0 && distToTurret <= shield.radius) {
+                        if (e.state !== "ATTACKING_SHIELD") {
+                            e.state = "ATTACKING_SHIELD";
+                            e.attackTimer = e.attackWindup;
+                        }
+                    } else if (distToTurret <= this.turret.baseRadius) {
+                        if (e.state !== "ATTACKING") {
+                            e.state = "ATTACKING";
+                            e.attackTimer = e.attackWindup;
+                        }
+                    } else {
+                        e.state = "MOVING";
+                    }
+                } else {
+                    e.state = "MOVING";
+                }
+
+                if (e.state === "MOVING") {
+                    const moveSpeed = e.speed * (e.speedMultiplier || 1) * 0.5 * dt;
+                    e.x += (fdx / fdist) * moveSpeed;
+                    e.y += (fdy / fdist) * moveSpeed;
+                }
+            }
+
+            // 攻击炮台（仅敌对单位，持续攻击不消失）
+            if (e.faction !== "PLAYER" && e.type !== 'SCOUT' && (e.state === "ATTACKING" || e.state === "ATTACKING_SHIELD")) {
+                e.attackTimer--;
+
+                if (e.attackTimer <= 0) {
+                    let damage = Math.max(0.5, e.damage * 1);
+
+                    // ARM-T3-A: Absolute Defense — 永久减伤50%（GLOBAL）
+                    if (this.isModifierActive('ARM-T3-A')) damage *= 0.5;
+
+                    // armor damage reduction
+                    const damageReduction = Math.min(this.turret.stats.armor * 0.05, 0.75);
+                    damage *= (1 - damageReduction);
+
+                    if (e.state === "ATTACKING_SHIELD") {
+                        const shield = this.turret.shield;
+                        shield.current -= damage;
+                        if (shield.current <= 0) {
+                            shield.current = 0;
+                            shield.broken = true;
+                            shield.regenCooldown = shield.regenCooldownMax;
+                            this.createShieldBreakEffect(this.turret.x, this.turret.y);
+                        }
+                        e.attackTimer = e.attackCooldown;
+                        continue;
+                    }
+
+                    this.turret.stats.hp -= damage;
+                    if (this.turret.shield.broken) {
+                        this.regenSuppressionTimer = this.regenSuppressionDuration;
+                        this.regenSuppressed = true;
+                        if (this.suppressionHintCooldown <= 0) {
+                            this.spawnFloatingText(
+                                this.turret.x,
+                                this.turret.y - 30,
+                                "REGEN SUPPRESSED",
+                                "#ffaa44",
+                                0.8
+                            );
+                            this.suppressionHintCooldown = 30;
+                        }
+                    }
+                    e.attackTimer = e.attackCooldown;
+
+                    // ARM-T1-A: Damage Reflection — 反弹20%给攻击者（GLOBAL）
+                    if (this.isModifierActive('ARM-T1-A')) {
+                        e.hp -= damage * 0.20;
+                        this.createExplosion(e.x, e.y, '#4d96ff', 5);
+                    }
+
+                    this.createExplosion(this.turret.x, this.turret.y, '#ff4444', 3);
+
+                    if (this.turret.stats.hp <= 0) {
+                        // HP-T3-A: Immortal Core — HP无法低于25%（GLOBAL）
+                        if (this.isModifierActive('HP-T3-A')) {
+                            this.turret.stats.hp = Math.ceil(this.turret.stats.maxHp * 0.25);
+                            continue;
+                        }
+                        // HP-T2-A: Death Prevention — 致命伤害留1 HP，60s冷却（GLOBAL）
+                        if (this.isModifierActive('HP-T2-A') && !this.modifierState.reviveUsed) {
+                            this.modifierState.reviveUsed = true;
+                            this.modifierState.reviveCooldown = 3600;
+                            this.turret.stats.hp = 1;
+                            this.createExplosion(this.turret.x, this.turret.y, '#6bcb77', 30);
+                            this.playTone(440, 0.3, 'triangle', 0.1, 880);
+                            continue;
+                        }
+                        this.grantRelic();
+                        this.showRelicReward();
+
+                        this.gameOver = true;
+                        this.ui.failWave.innerHTML =
+                            `Wave ${this.wave} 失败<br>总战力: ${(
+                                this.turret.stats.atk +
+                                this.turret.stats.speed +
+                                this.turret.stats.armor
+                            ).toFixed(1)}`;
+                        this.ui.gameOver.style.display = 'block';
+                    }
+                }
+            }
+
+            // 子弹碰撞（仅敌对单位）
+            if (e.faction === "PLAYER") continue;
+            for (let j = this.bullets.length - 1; j >= 0; j--) {
+                const b = this.bullets[j];
+                if (Math.hypot(b.x - e.x, b.y - e.y) < e.radius + b.radius) {
+                    const hitResult = this.applyDamageWithCrit(b.damage, e);
+                    let finalDmg = hitResult.damage;
+                    
+                    e.hp -= finalDmg;
+                    
+                    // 子弹即将移除，先保存属性用于后续
+                    const wasCannon = b.isCannon;
+                    const splashRad = b.splashRadius || 0;
+                    const bulletX = b.x, bulletY = b.y;
+                    const bulletDmg = b.damage;
+
+                    this.bullets.splice(j, 1);
+
+                    if (wasCannon && splashRad > 0) {
+                        const scaledSplash = splashRad * (hitResult.radiusScale || 1);
+                        this.createExplosion(e.x, e.y, '#ff9f43', 10);
+                        this.enemies.forEach(nearby => {
+                            if (nearby === e || nearby.hp <= 0) return;
+                            const sd = Math.hypot(nearby.x - e.x, nearby.y - e.y);
+                            if (sd < scaledSplash) {
+                                const splashHit = this.applyDamageWithCrit(bulletDmg * 0.5, nearby);
+                                nearby.hp -= splashHit.damage;
+                            }
+                        });
+
+                        // Hook #3: WARHEAD_REPLICATOR (火箭暴击时额外爆炸)
+                        if (hitResult.isCrit && this.hasKeystone("WARHEAD_REPLICATOR")) {
+                            this.createExplosion(bulletX, bulletY, '#ff6b6b', 15);
+                            this.enemies.forEach(nearby => {
+                                if (nearby.hp <= 0) return;
+                                const sd = Math.hypot(nearby.x - bulletX, nearby.y - bulletY);
+                                if (sd < 80) nearby.hp -= bulletDmg * 0.3;
+                            });
+                        }
+                    }
+                    
+                    if (e.hp <= 0) {
+                        this.onEnemyKilled(e);
+                        this.handleScoutDefeat(e);
+                        // 激光连锁爆炸
+                        if (this.turret.stats.weaponType === 'LASER') {
+                            this.enemies.forEach(nearby => {
+                                if (Math.hypot(nearby.x - e.x, nearby.y - e.y) < 60) {
+                                    nearby.hp -= this.turret.stats.atk * 0.5;
+                                }
+                            });
+                        }
+                        
+                        this.collectedResources[e.reward] = (this.collectedResources[e.reward] || 0) + 1;
+                        this.createExplosion(e.x, e.y, e.color, 8);
+                        if (this.markedTarget === e) {
+                            this.markedTarget = null;
+                            this.markTimer = 0;
+                        }
+                        this.enemies.splice(i, 1);
+                        break;
+                    }
+                }
+            }
+
+            // converted unit lifetime decay
+            if (e.isConverted) {
+
+                e.convertedLifetime -= dt;
+
+                if (e.convertedLifetime <= 0) {
+                    e.dead = true;
+                }
+            }
+        }
+
+        // 子弹移动
+        for (let i = this.bullets.length - 1; i >= 0; i--) {
+            const b = this.bullets[i];
+            b.x += b.vx * dt;
+            b.y += b.vy * dt;
+            b.distance += b.speed * dt;
+            if (b.distance > b.maxDistance) this.bullets.splice(i, 1);
+        }
+
+        // 子弹与结构碰撞（只有揭示后可攻击）
+        for (let i = this.structures.length - 1; i >= 0; i--) {
+            const s = this.structures[i];
+            if (s.hp <= 0) {
+                this.createExplosion(s.x, s.y, '#f5cd79', 20);
+                this.structures.splice(i, 1);
+                continue;
+            }
+            const visible = this.isPositionRevealed(s.x, s.y);
+            if (!visible) continue;
+
+            for (let j = this.bullets.length - 1; j >= 0; j--) {
+                const b = this.bullets[j];
+                if (Math.abs(b.x - s.x) < s.size && Math.abs(b.y - s.y) < s.size) {
+                    const structureHit = this.applyDamageWithCrit(b.damage, s);
+                    s.hp -= structureHit.damage;
+                    this.bullets.splice(j, 1);
+
+                    if (s.hp <= 0) {
+                        this.createExplosion(s.x, s.y, '#f5cd79', 20);
+                        this.structures.splice(i, 1);
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 粒子效果
+        for (let i = this.particles.length - 1; i >= 0; i--) {
+            const p = this.particles[i];
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.life -= dt;
+            if (p.life <= 0) this.particles.splice(i, 1);
+        }
+
+        // BIO field update
+        this.bioFields.forEach(field => {
+
+            field.duration--;
+
+            this.enemies.forEach(enemy => {
+
+                if (enemy.dead) return;
+                if (enemy.isConverted) return;
+
+                const dx = enemy.x - field.x;
+                const dy = enemy.y - field.y;
+
+                const distSq = dx*dx + dy*dy;
+
+                if (distSq <= field.radius * field.radius) {
+
+                    const hpLevel = this.playerStats.hp || 0;
+                    const conversionRate = 0.004 + hpLevel * 0.003;
+                    enemy.conversionProgress += conversionRate;
+
+                    if (enemy.conversionProgress >= 1) {
+                        this.convertEnemy(enemy);
+                    }
+                }
+            });
+
+        });
+
+        // remove expired fields
+        this.bioFields = this.bioFields.filter(f => f.duration > 0);
+
+        // floating texts update
+        for (let i = this.floatingTexts.length - 1; i >= 0; i--) {
+            const t = this.floatingTexts[i];
+            t.life -= dt;
+            t.y -= 0.45 * dt;
+            if (t.life <= 0) this.floatingTexts.splice(i, 1);
+        }
+
+        // 🎯 波次完成检测
+        this.checkWaveComplete();
+        
+    }
+
+    isHostile(enemy) {
+        return (
+            enemy &&
+            !enemy.dead &&
+            enemy.faction === "ENEMY"
+        );
+    }
+
+    checkWaveComplete() {
+        if (this.waveTransitioning) return;
+        const allSpawned = this.enemiesSpawned >= this.enemiesToSpawn;
+
+        let hostileCount = 0;
+        this.enemies.forEach(e => {
+            if (this.isHostile(e)) hostileCount++;
+        });
+        const allDead = hostileCount === 0;
+
+        if (allSpawned && allDead) {
+            console.log(`Wave ${this.wave} 完成`);
+            this.waveTransitioning = true;
+            this.isPaused = true;
+            
+            if (this.wave >= 300) {
+                this.ui.victory.style.display = 'block';
+                this.gameOver = true;
+            } else {
+                this.showUpgradePanel();
+            }
+        }
+    }
+
+    loop(now = performance.now()) {
+        const deltaMs = Math.min(50, Math.max(0, now - this.lastFrameTime));
+        this.lastFrameTime = now;
+        if (this.hitStopMs > 0) this.hitStopMs = Math.max(0, this.hitStopMs - deltaMs);
+        if (this.superCritFlashMs > 0) this.superCritFlashMs = Math.max(0, this.superCritFlashMs - deltaMs);
+        const hitStopFactor = this.hitStopMs > 0 ? 0.15 : 1;
+        const dt = (deltaMs / 16.6667) * this.timeScale * hitStopFactor;
+
+        this.update(dt);
+        this.draw();
+        this.uiElapsedMs += deltaMs;
+        if (this.uiElapsedMs >= 100) {
+            this.uiElapsedMs = 0;
+            this.updateUI();
+        }
+        requestAnimationFrame((ts) => this.loop(ts));
+    }
+
+    spawnEnemy(requestedType = null) {
+        const x = Math.random() * canvas.width;
+        const y = -40;
+
+        let role = (requestedType || "normal").toLowerCase();
+        if (role === "fast") role = "runner";
+        if (role === "speedster") role = "runner";
+        if (!this.ENEMY_TYPES[role]) role = "normal";
+
+        // fallback random role selection (兼容潜在旧调用)
+        if (!requestedType) {
+            const roll = Math.random();
+            if (roll < 0.60) role = "normal";
+            else if (roll < 0.80) role = "runner";
+            else role = "tank";
+        }
+
+        const typeMap = {
+            normal: "NORMAL",
+            runner: "SPEEDSTER",
+            tank: "TANK",
+            elite: "ELITE",
+            boss: "BOSS",
+            scout: "SCOUT"
+        };
+        const type = typeMap[role] || "NORMAL";
+
+        const base = this.ENEMY_TYPES[role] || this.ENEMY_TYPES.normal;
+        const hpScale = 0.03 * Math.pow(1.12, this.wave);
+        const speedScale = 1 + this.wave * 0.015;
+        const dmgScale = 1 + this.wave * 0.01;
+
+        const stats = {
+            hp: Math.max(1, Math.floor(base.hp * hpScale)),
+            speed: base.speed * speedScale,
+            radius: base.radius,
+            color: base.color,
+            reward: base.reward
+        };
+
+        // scout 依旧保持轻快定位，不参与重型围攻节奏
+        if (type === "SCOUT") {
+            stats.speed = Math.max(stats.speed, 2.2);
+        }
+
+        const enemy = {
+            x, y, type,
+            hp: stats.hp,
+            maxHp: stats.hp,
+            speed: stats.speed,
+            radius: stats.radius,
+            color: stats.color,
+            reward: stats.reward,
+
+            // ===== Entity Classification =====
+            faction: "ENEMY",
+            entityType: "COMBAT",
+
+            // assimilation state
+            isConverted: false,
+            conversionProgress: 0,
+
+            // snapshot storage
+            originalHP: stats.hp,
+            originalSpeed: stats.speed,
+
+            // ===== Attack State =====
+            state: "MOVING",
+            attackWindup: 30,
+            attackTimer: 30,
+            attackCooldown: Math.max(35, Math.floor(base.attackCooldown)),
+            damage:         base.damage * dmgScale * 0.7,
+            attackRange:    stats.radius + 35
+        };
+        if (type === 'SCOUT') {
+            enemy.state = 'SEEK_BEACON';
+            enemy.canDropFlare = true;
+            enemy.priorityTarget = 'BEACON';
+            enemy.hasEnteredForwardZone = false;
+        }
+
+        this.enemies.push(enemy);
+
+        this.enemiesSpawned++;
+    }
+
+    createBioField(x, y) {
+
+        this.bioFields.push({
+            x: x,
+            y: y,
+            radius: 90,
+            duration: 600
+        });
+
+    }
+
+    findNearestHostile(unit) {
+
+        let nearest = null;
+        let bestDist = Infinity;
+
+        this.enemies.forEach(e => {
+            if (e.dead) return;
+            if (e.faction === unit.faction) return;
+
+            const dx = e.x - unit.x;
+            const dy = e.y - unit.y;
+            const dist = dx*dx + dy*dy;
+
+            if (dist < bestDist) {
+                bestDist = dist;
+                nearest = e;
+            }
+        });
+
+        return nearest;
+    }
+
+    findNearestEnemy() {
+
+        let nearest = null;
+        let bestDist = Infinity;
+
+        this.enemies.forEach(enemy => {
+
+            if (enemy.dead) return;
+            if (enemy.isConverted) return;
+
+            const dx = enemy.x - this.turret.x;
+            const dy = enemy.y - this.turret.y;
+
+            const dist = dx * dx + dy * dy;
+
+            if (dist < bestDist) {
+                bestDist = dist;
+                nearest = enemy;
+            }
+        });
+
+        return nearest;
+    }
+
+    // ===== Assimilation Conversion Function =====
+    getConversionCapacity() {
+        const hpLevel = this.playerStats.hp || 0;
+        return Math.floor(2 + hpLevel * 0.6);
+    }
+
+    getConvertedCount() {
+        let count = 0;
+        this.enemies.forEach(enemy => {
+            if (!enemy.dead && enemy.isConverted) count++;
+        });
+        return count;
+    }
+
+    convertEnemy(enemy) {
+
+        if (!enemy) return;
+        if (enemy.isConverted) return;
+
+        const capacity = this.getConversionCapacity();
+        const current = this.getConvertedCount();
+
+        if (current >= capacity) {
+
+            // capacity full → retire oldest converted unit to make room
+            let oldest = null;
+
+            this.enemies.forEach(e => {
+
+                if (!e.isConverted || e.dead) return;
+
+                if (!oldest ||
+                    e.convertedLifetime < oldest.convertedLifetime)
+                {
+                    oldest = e;
+                }
+
+            });
+
+            if (oldest) oldest.dead = true;
+            else return; // safety: no slot freed, abort
+        }
+
+        enemy.isConverted = true;
+        enemy.faction = "PLAYER";
+
+        // topology snapshot scaling
+        const hpLevel = this.playerStats.hp || 0;
+        const topologyScaling = 1 + hpLevel * 0.05;
+
+        enemy.hp = enemy.originalHP * 0.6 * topologyScaling;
+        enemy.maxHp = enemy.hp;
+
+        enemy.speed = enemy.originalSpeed * 0.9;
+
+        // lifetime scales with HP node
+        const baseLifetime = 3600;
+        const lifetimeScaling = 1 + hpLevel * 0.08;
+        enemy.maxConvertedLifetime = Math.floor(baseLifetime * lifetimeScaling);
+        enemy.convertedLifetime = enemy.maxConvertedLifetime;
+
+    }
+
+    createExplosion(x, y, color, count = 5) {
+        for (let i = 0; i < count; i++) {
+            this.particles.push({
+                x, y, 
+                vx: (Math.random()-0.5)*6, 
+                vy: (Math.random()-0.5)*6,
+                life: 30, color, alpha: 1
+            });
+        }
+    }
+
+    // ===== Topology Overlay Visual System (Safe Version) =====
+    renderTopologyOverlay(entity) {
+
+        if (!entity) return;
+
+        // conversion progress ring (visible before full conversion)
+        if (!entity.isConverted && entity.conversionProgress > 0) {
+
+            ctx.strokeStyle = "rgba(80,255,180,0.6)";
+            ctx.lineWidth = 2;
+
+            ctx.beginPath();
+            ctx.arc(
+                entity.x,
+                entity.y,
+                entity.radius * 1.6,
+                -Math.PI / 2,
+                -Math.PI / 2 + Math.PI * 2 * entity.conversionProgress
+            );
+            ctx.stroke();
+        }
+
+        if (!entity.isConverted) return;
+
+        const x = entity.x;
+        const y = entity.y;
+        const r = entity.radius || 10;
+
+        ctx.save();
+
+        // topology glow
+        ctx.globalAlpha = 0.4;
+        ctx.fillStyle = "rgba(80,255,180,0.35)";
+        ctx.beginPath();
+        ctx.arc(x, y, r * 1.4, 0, Math.PI * 2);
+        ctx.fill();
+
+        // core indicator
+        ctx.globalAlpha = 0.9;
+        ctx.fillStyle = "rgba(120,255,200,0.9)";
+        ctx.beginPath();
+        ctx.arc(x, y, r * 0.35, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+    }
+
+    // 找出 playerStats 中最高的节点
+    getDominantNode() {
+        let maxStat = null;
+        let maxValue = -Infinity;
+        let secondValue = -Infinity;
+
+        for (const stat in this.playerStats) {
+            const v = this.playerStats[stat];
+            if (v > maxValue) {
+                secondValue = maxValue;
+                maxValue = v;
+                maxStat = stat;
+            } else if (v > secondValue) {
+                secondValue = v;
+            }
+        }
+
+        // 必须满足 dominance ratio ≥ 1.25，防止 weapon flickering
+        if (maxValue <= 0) return null;
+        if (secondValue <= 0) return maxStat; // 其他全是0，无条件dominant
+        const ratio = maxValue / secondValue;
+        if (ratio < this.dominanceRatioThreshold) return null; // 太接近，保持当前武器
+        return maxStat;
+    }
+
+    updateWeaponFromTopology() {
+        const dominant = this.getDominantNode();
+        if (!dominant) return; // ratio 不足，不切换
+
+        const newWeapon = this.weaponTier1Map[dominant] || 'BULLET';
+        if (this.currentWeapon !== newWeapon) {
+            this.currentWeapon = newWeapon;
+            this.onWeaponChanged(newWeapon);
+        }
+    }
+
+    onWeaponChanged(weapon) {
+        const color = this.weaponColors[weapon] || '#3498db';
+        this.weaponSwitchFlash = 1.0;
+
+        // 同步 turret fireRate 给不同武器手感
+        const fireRates = {
+            INCENDIARY:     18,
+            LASER:          6,
+            BIO_LAUNCHER:   28,
+            REFLECT_SHIELD: 999,  // 被动，不主动开火
+            PLASMA:         22,
+            RAILGUN:        45,
+            SNIPER:         55,
+            BULLET:         20
+        };
+        this.turret.stats.fireRate = fireRates[weapon] ?? 20;
+
+        // 视觉爆发
+        this.createExplosion(this.turret.x, this.turret.y, color, 25);
+        console.log(`[Weapon] 切换至 ${weapon} (dominant: ${this.getDominantNode()})`);
+    }
+
+    // 旧方法保留为空壳，防止残留调用报错
+    updateWeaponType() {
+        this.updateWeaponFromTopology();
+    }
+
+    showUpgradePanel() {
+        const panel = this.ui.upgradePanel;
+        const btnContainer = this.ui.upgradeButtons;
+        btnContainer.innerHTML = '';
+        
+        const choices = [];
+        const pool = [...this.upgradeOptions];
+        
+        for(let i=0; i<3; i++) {
+            if (pool.length === 0) break;
+            const idx = Math.floor(Math.random() * pool.length);
+            choices.push(pool.splice(idx, 1)[0]);
+        }
+        
+        choices.forEach(opt => {
+            const btn = document.createElement('button');
+            btn.innerHTML = `
+                <div style="font-weight: bold;">${opt.label}</div>
+                <div style="font-size: 12px; color: #aaa; margin-top: 5px;">${opt.desc}</div>
+            `;
+            btn.onclick = () => this.applyUpgrade(opt);
+            btnContainer.appendChild(btn);
+        });
+        
+        this.ui.upgradeTitle.textContent = `Wave ${this.wave} 完成!`;
+        
+        const hint = this.ui.weaponHint;
+        const dominant = this.getDominantNode();
+        if (dominant) {
+            const weapon = this.weaponTier1Map[dominant];
+            const color = this.weaponColors[weapon];
+            hint.style.display = 'block';
+            hint.style.borderColor = color;
+            hint.innerHTML = `<span style="color:${color}">⚡ ${this.getWeaponName(weapon)}</span> 已激活（${dominant} 领先）`;
+        } else {
+            hint.style.display = 'block';
+            hint.style.borderColor = '#888';
+            hint.innerHTML = `<span style="color:#888">💡 某属性达到 1.25x 优势时解锁专属武器</span>`;
+        }
+        
+        panel.style.display = 'block';
+    }
+
+    getWeaponName(type) {
+        const names = {
+            'BULLET':         '🔫 基础子弹',
+            'LASER':          '⚡ 激光',
+            'INCENDIARY':     '🔥 燃烧弹',
+            'BIO_LAUNCHER':   '🧬 生化炮',
+            'REFLECT_SHIELD': '🛡️ 反射盾',
+            'PLASMA':         '🌀 等离子',
+            'RAILGUN':        '🚀 轨道炮',
+            'SNIPER':         '🎯 狙击枪'
+        };
+        return names[type] || type;
+    }
+
+    applyUpgrade(opt) {
+        console.log(`升级选择: ${opt.key} +${opt.value}`);
+        
+        if (opt.key === 'maxHp') {
+            this.turret.stats.maxHp += opt.value;
+            this.turret.stats.hp = this.turret.stats.maxHp;
+        } else if (opt.key === 'view') {
+            this.turret.stats.view = Math.min(this.viewCap, (this.turret.stats.view || 0) + opt.value);
+        } else {
+            this.turret.stats[opt.key] = (this.turret.stats[opt.key] || 0) + opt.value;
+        }
+        
+        const statKeyMap = { atk: 'ATK', speed: 'SPEED', maxHp: 'HP', armor: 'ARMOR', special: 'SPECIAL', range: 'RANGE', view: 'VIEW' };
+        if (statKeyMap[opt.key]) {
+            this.runUpgrades[statKeyMap[opt.key]] += 1;
+            this.playerStats[statKeyMap[opt.key]] += 1;
+        }
+        if (opt.key === 'armor') this.updateShieldStats();
+
+        this.collectedResources[opt.key] = (this.collectedResources[opt.key] || 0) + 1;
+        this.updateWeaponFromTopology();
+        this.ui.upgradePanel.style.display = 'none';
+
+        // threshold 检测 — 若触发则暂存 wave 推进，等 modifier 选完再继续
+        this.pendingWaveAdvance = true;
+        if (statKeyMap[opt.key]) {
+            this.checkNodeThresholdUnlock(statKeyMap[opt.key]);
+        }
+
+        // 没有 threshold 触发（面板没有再次打开），直接推进
+        if (this.pendingWaveAdvance) {
+            this.advanceWave();
+        }
+    }
+
+    advanceWave() {
+        this.pendingWaveAdvance = false;
+
+        // HP-T1-A: Regeneration — 每3秒回1 HP（timer 在 update() 处理，这里不处理）
+
+        this.wave++;
+        this.enemiesSpawned = 0;
+        this.wavePackets = this.generateWavePackets(this.wave);
+        this.currentPacket = 0;
+        this.packetEnemyIndex = 0;
+        this.packetTimer = 0;
+        this.enemiesToSpawn = this.getTotalEnemiesFromPackets(this.wavePackets);
+        this.spawnTimer = 0;
+        this.waveTransitioning = false;
+        this.activeFlares = this.activeFlares.filter(flare => flare.expiresAtWave > this.wave);
+        this.isPaused = false;
+        console.log(`进入 Wave ${this.wave}, 敌人数量: ${this.enemiesToSpawn}`);
+    }
+
+    // ===== Node Threshold System =====
+
+    checkNodeThresholdUnlock(stat) {
+        const value = this.playerStats[stat];
+        const thresholds = this.nodeThresholds[stat];
+        if (!thresholds) return;
+
+        for (const t of thresholds) {
+            if (value >= t && !this.nodeUnlocked[stat][t]) {
+                this.nodeUnlocked[stat][t] = true;
+                this.triggerModifierUnlock(stat, t);
+                return; // 每次只弹一个，串行处理
+            }
+        }
+    }
+
+    triggerModifierUnlock(stat, threshold) {
+        console.log(`[Modifier Unlock] ${stat} reached ${threshold}`);
+        const options = this.getModifierOptions(stat, threshold);
+        if (options.length === 0) return;
+        this.showModifierSelection(stat, threshold, options);
+    }
+
+    getModifierOptions(stat, threshold) {
+        // ID 格式：NODE-TiTier-Letter，与 modifierDefs 严格对齐
+        const pool = {
+            ATK: {
+                3:  [
+                    { id: 'ATK-T1-A', name: 'Focus Fire',          desc: '目标优先级改为最远敌人' },
+                    { id: 'ATK-T1-B', name: 'Overcharge Protocol', desc: '每第4次攻击造成300%伤害' }
+                ],
+                6:  [
+                    { id: 'ATK-T2-A', name: 'Piercing Rounds',     desc: '子弹穿透所有敌人直至最大射程（需 INCENDIARY 激活）' },
+                    { id: 'ATK-T2-B', name: 'Execution Protocol',  desc: 'HP低于20%的敌人直接处决' }
+                ],
+                10: [
+                    { id: 'ATK-T3-A', name: 'Terminal Singularity',desc: '敌人死亡触发爆炸 radius:80, 50%伤害' }
+                ]
+            },
+            SPEED: {
+                3:  [
+                    { id: 'SPD-T1-A', name: 'Acceleration Feedback',desc: '每次连续命中+5%攻速，未命中归零' },
+                    { id: 'SPD-T1-B', name: 'Temporal Compression', desc: '冷却时间减少30%（需 LASER 激活）' }
+                ],
+                6:  [
+                    { id: 'SPD-T2-A', name: 'Time Fracture',        desc: '暴击后下次攻击冷却归零' }
+                ],
+                10: [
+                    { id: 'SPD-T3-A', name: 'Overclock Singularity',desc: '移除攻速上限' }
+                ]
+            },
+            HP: {
+                3:  [
+                    { id: 'HP-T1-A',  name: 'Regeneration',         desc: '每3秒回复1 HP' }
+                ],
+                6:  [
+                    { id: 'HP-T2-A',  name: 'Death Prevention',     desc: '致命伤害留1 HP，60s冷却' }
+                ],
+                10: [
+                    { id: 'HP-T3-A',  name: 'Immortal Core',        desc: 'HP无法低于25%最大值' }
+                ]
+            },
+            ARMOR: {
+                3:  [
+                    { id: 'ARM-T1-A', name: 'Damage Reflection',    desc: '受击反弹20%伤害给攻击者' }
+                ],
+                6:  [
+                    { id: 'ARM-T2-A', name: 'Shield Field',         desc: '每5s生成护盾，可吸收一次伤害' }
+                ],
+                10: [
+                    { id: 'ARM-T3-A', name: 'Absolute Defense',     desc: '永久减伤50%' }
+                ]
+            },
+            SPECIAL: {
+                3:  [
+                    { id: 'SPC-T1-A', name: 'Critical Cascade',     desc: '暴击触发 radius:60 二次爆炸' }
+                ],
+                6:  [
+                    { id: 'SPC-T2-A', name: 'Probability Distortion',desc: '暴击率翻倍' }
+                ],
+                10: [
+                    { id: 'SPC-T3-A', name: 'Reality Collapse',     desc: '每次攻击随机触发额外效果' }
+                ]
+            },
+            RANGE: {
+                3:  [
+                    { id: 'RNG-T1-A', name: 'Extended Ballistics',  desc: '弹体存活时间+50%' }
+                ],
+                6:  [
+                    { id: 'RNG-T2-A', name: 'Rail Penetration',     desc: '弹体穿透所有敌人' }
+                ],
+                10: [
+                    { id: 'RNG-T3-A', name: 'Infinite Projection',  desc: '射程无限制' }
+                ]
+            },
+            VIEW: {
+                3:  [
+                    { id: 'VIEW-T1-A',name: 'Signal Reveal',        desc: '命中敌人短暂扩展视野至其周围' }
+                ],
+                6:  [
+                    { id: 'VIEW-T2-A',name: 'Predictive Targeting', desc: '瞄准敌人预测位置而非当前位置' }
+                ],
+                10: [
+                    { id: 'VIEW-T3-A',name: 'Omniscience',          desc: '永久全图可见，移除迷雾' }
+                ]
+            }
+        };
+
+        return pool[stat]?.[threshold] ?? [];
+    }
+
+    showModifierSelection(stat, threshold, options) {
+        // 暂停 wave 推进，等玩家选完
+        this.pendingWaveAdvance = false;
+        this.isPaused = true;
+
+        const nodeColors = {
+            ATK:'#ff6b6b', SPEED:'#ffd93d', HP:'#6bcb77',
+            ARMOR:'#4d96ff', SPECIAL:'#c77dff', RANGE:'#ff9f1c', VIEW:'#00f5d4'
+        };
+        const color = nodeColors[stat] || '#4ecdc4';
+
+        const panel = this.ui.upgradePanel;
+        const btnContainer = this.ui.upgradeButtons;
+        btnContainer.innerHTML = '';
+
+        this.ui.upgradeTitle.innerHTML =
+            `<span style="color:${color}">${stat}</span>` +
+            ` Threshold <span style="color:#ffd93d">${threshold}</span> 达成`;
+
+        // 隐藏武器提示，避免混淆
+        this.ui.weaponHint.style.display = 'none';
+
+        options.forEach(mod => {
+            const btn = document.createElement('button');
+            btn.innerHTML =
+                `<div style="font-weight:bold;color:${color}">${mod.name}</div>` +
+                `<div style="font-size:12px;color:#aaa;margin-top:5px">${mod.desc}</div>`;
+            btn.onclick = () => {
+                this.applyModifier(mod);
+                panel.style.display = 'none';
+                this.pendingWaveAdvance = true;
+                this.advanceWave();
+            };
+            btnContainer.appendChild(btn);
+        });
+
+        panel.style.display = 'block';
+    }
+
+    applyModifier(mod) {
+        this.ownModifier(mod.id);
+
+        // 初始化 modifier 专属运行时状态
+        switch (mod.id) {
+            case 'ATK-T1-B': this.modifierState.overchargeCounter = 0;   break;
+            case 'HP-T2-A':  this.modifierState.reviveUsed = false;
+                             this.modifierState.reviveCooldown = 0;       break;
+            case 'VIEW-T3-A':this.turret.stats.view = 99999;             break;
+            case 'ARM-T3-A': /* 永久减伤，在 damage calc 检查 */         break;
+        }
+    }
+
+    // 动态计算 modifier 是否激活（不依赖 stored flag）
+    isModifierActive(id) {
+        if (!this.ownedModifiers.has(id)) return false;
+        const def = this.modifierDefs[id];
+        if (!def) return false;
+        if (def.class === 'GLOBAL')   return true;
+        if (def.class === 'WEAPON')   return this.getActiveWeapon() === def.weapon;
+        if (def.class === 'TOPOLOGY') return this.getDominantNode() === def.node;
+        return false;
+    }
+
+    // 向后兼容 — 内部全部改用 isModifierActive
+    hasModifier(id) {
+        return this.isModifierActive(id);
+    }
+
+    ownModifier(id) {
+        if (this.ownedModifiers.has(id)) return; // 防重复
+        this.ownedModifiers.add(id);
+        console.log(`[Modifier Owned] ${id} | class: ${this.modifierDefs[id]?.class}`);
+    }
+
+    draw() {
+        ctx.fillStyle = '#0f0f23';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        this.drawFog();
+        this.drawGameObjects();
+        this.drawRangeIndicators();
+
+        // Radar：平滑展开/收起动画
+        const radarTarget = this.radarExpanded ? 1 : 0;
+        this.radarTransition += (radarTarget - this.radarTransition) * 0.15;
+
+        // 展开时加遮罩
+        if (this.radarTransition > 0.01) {
+            ctx.fillStyle = `rgba(0,0,0,${0.55 * this.radarTransition})`;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        const rcx    = lerp(canvas.width - 120, canvas.width / 2,  this.radarTransition);
+        const rcy    = lerp(canvas.height - 120, canvas.height / 2, this.radarTransition);
+        const rradius = lerp(70, 180, this.radarTransition);
+        this.drawHeptagonRadar(ctx, rcx, rcy, rradius);
+    }
+
+    drawFog() {
+        const effectiveView = this.getEffectiveView();
+        const gradient = ctx.createRadialGradient(
+            this.turret.x, this.turret.y, effectiveView * 0.3,
+            this.turret.x, this.turret.y, effectiveView
+        );
+        gradient.addColorStop(0, 'rgba(0,0,0,0)');
+        gradient.addColorStop(0.6, 'rgba(0,0,0,0.4)');
+        gradient.addColorStop(1, 'rgba(0,0,0,0.95)');
+        
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        this.activeFlares.forEach(flare => {
+            const flareGrad = ctx.createRadialGradient(flare.x, flare.y, 0, flare.x, flare.y, flare.radius);
+            flareGrad.addColorStop(0, 'rgba(255, 245, 180, 0.75)');
+            flareGrad.addColorStop(0.5, 'rgba(255, 230, 120, 0.30)');
+            flareGrad.addColorStop(1, 'rgba(255, 220, 100, 0)');
+            ctx.fillStyle = flareGrad;
+            ctx.fillRect(flare.x - flare.radius, flare.y - flare.radius, flare.radius * 2, flare.radius * 2);
+        });
+    }
+
+    drawGameObjects() {
+        const effective = this.getEffectiveCombatStats();
+        if (this.laserTimer > 0 && this.turret.target) {
+            ctx.strokeStyle = '#4ecdc4';
+            ctx.lineWidth = 4;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#4ecdc4';
+            ctx.beginPath(); 
+            ctx.moveTo(this.turret.x, this.turret.y);
+            ctx.lineTo(this.turret.target.x, this.turret.target.y); 
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
+        
+        this.bullets.forEach(b => {
+            ctx.fillStyle = b.isCannon ? '#ff9f43' : '#ffd93d';
+            ctx.beginPath(); 
+            ctx.arc(b.x, b.y, b.radius, 0, Math.PI*2); 
+            ctx.fill();
+        });
+
+        this.enemies.forEach(e => {
+            const distToTurret = Math.hypot(e.x - this.turret.x, e.y - this.turret.y);
+            if (!this.isPositionRevealed(e.x, e.y)) return;
+            
+            let alpha = 0.4;
+            if (distToTurret < effective.range) alpha = 1.0;
+            
+            ctx.globalAlpha = alpha;
+            
+            if (e.type === 'BOSS') {
+                ctx.strokeStyle = '#9b59b6';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(e.x, e.y, e.radius + 10, 0, Math.PI * 2);
+                ctx.stroke();
+                
+                ctx.fillStyle = '#1a1a2e';
+                ctx.fillRect(e.x - 30, e.y - e.radius - 15, 60, 6);
+                ctx.fillStyle = '#9b59b6';
+                ctx.fillRect(e.x - 30, e.y - e.radius - 15, (e.hp / e.maxHp) * 60, 6);
+            }
+            
+            ctx.fillStyle = e.color;
+            ctx.beginPath(); 
+            ctx.arc(e.x, e.y, e.radius, 0, Math.PI*2); 
+            ctx.fill();
+
+            this.renderTopologyOverlay(e);
+
+            if (e === this.markedTarget) {
+                ctx.strokeStyle = '#ffd93d';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(e.x, e.y, e.radius + 8, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+            
+            if (e.hp < e.maxHp && e.type !== 'BOSS') {
+                ctx.fillStyle = '#1a1a2e';
+                ctx.fillRect(e.x - 15, e.y - e.radius - 8, 30, 4);
+                ctx.fillStyle = '#2ecc71';
+                ctx.fillRect(e.x - 15, e.y - e.radius - 8, (e.hp / e.maxHp) * 30, 4);
+            }
+        });
+        
+        ctx.globalAlpha = 1;
+        
+        // BIO field render
+        this.bioFields.forEach(field => {
+
+            ctx.save();
+
+            ctx.globalAlpha = 0.2;
+
+            ctx.fillStyle = "rgba(80,255,180,0.25)";
+
+            ctx.beginPath();
+            ctx.arc(field.x, field.y, field.radius, 0, Math.PI*2);
+            ctx.fill();
+
+            ctx.restore();
+
+        });
+
+        this.particles.forEach(p => {
+            if (this.isPositionRevealed(p.x, p.y)) {
+                ctx.globalAlpha = Math.max(0, p.life / 30);
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x-2, p.y-2, 4, 4);
+            }
+        });
+        
+        ctx.globalAlpha = 1;
+
+        this.floatingTexts.forEach(t => {
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, t.life / t.maxLife);
+            ctx.fillStyle = t.color;
+            ctx.font = `bold ${Math.max(10, Math.floor(16 * t.scale))}px monospace`;
+            ctx.textAlign = 'center';
+            ctx.fillText(t.text, t.x, t.y);
+            ctx.restore();
+        });
+
+        const shield = this.turret.shield;
+        if (!shield.broken && shield.current > 0 && shield.max > 0) {
+            const ratio = shield.current / shield.max;
+            ctx.save();
+            ctx.strokeStyle = `rgba(80,160,255,${0.3 + ratio * 0.7})`;
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.arc(this.turret.x, this.turret.y, shield.radius, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+        }
+        
+        ctx.save();
+        ctx.translate(this.turret.x, this.turret.y);
+        ctx.rotate(this.turret.angle);
+        
+        const coreColor = this.weaponColors[this.getActiveWeapon()] || '#3498db';
+        
+        ctx.fillStyle = '#34495e';
+        ctx.beginPath(); 
+        ctx.arc(0, 0, 25, 0, Math.PI*2); 
+        ctx.fill();
+        
+        ctx.fillStyle = '#95a5a6'; 
+        ctx.fillRect(0, -8, 40, 16);
+
+        // weapon switch flash
+        if (this.weaponSwitchFlash > 0) {
+            this.weaponSwitchFlash = Math.max(0, this.weaponSwitchFlash - 0.04);
+            ctx.save();
+            ctx.globalAlpha = this.weaponSwitchFlash * 0.6;
+            ctx.shadowBlur = 30;
+            ctx.shadowColor = coreColor;
+            ctx.fillStyle = coreColor;
+            ctx.beginPath();
+            ctx.arc(0, 0, 22, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+        
+        ctx.fillStyle = coreColor;
+        ctx.beginPath(); 
+        ctx.arc(0, 0, 15, 0, Math.PI*2); 
+        ctx.fill();
+
+        if (this.superCritFlashMs > 0) {
+            const t = this.superCritFlashMs / 140;
+            const alpha = Math.max(0.2, t);
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.shadowBlur = 18;
+            ctx.shadowColor = '#ffffff';
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(0, 0, 17, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+        
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.beginPath(); 
+        ctx.arc(-5, -5, 5, 0, Math.PI*2); 
+        ctx.fill();
+        
+        ctx.restore();
+        this.drawTurretBars();
+
+        this.structures.forEach(s => {
+            if (!this.isPositionRevealed(s.x, s.y)) return;
+
+            const pulseSize = s.range + Math.sin(s.pulse) * 6;
+            ctx.save();
+            ctx.translate(s.x, s.y);
+            ctx.fillStyle = 'rgba(255,217,61,0.08)';
+            ctx.fillRect(-pulseSize, -pulseSize, pulseSize * 2, pulseSize * 2);
+            ctx.restore();
+
+            ctx.save();
+            ctx.translate(s.x, s.y);
+            ctx.rotate(Math.PI / 4 + s.rotation);
+            ctx.strokeStyle = '#ffd93d';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(-s.size, -s.size, s.size * 2, s.size * 2);
+            ctx.restore();
+        });
+    }
+
+    drawRangeIndicators() {
+        const effective = this.getEffectiveCombatStats();
+        ctx.strokeStyle = 'rgba(255, 217, 61, 0.2)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(this.turret.x, this.turret.y, effective.range, 0, Math.PI*2);
+        ctx.stroke();
+        
+        ctx.strokeStyle = 'rgba(78, 205, 196, 0.15)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath();
+        ctx.arc(this.turret.x, this.turret.y, this.getEffectiveView(), 0, Math.PI*2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    }
+
+    drawHeptagonRadar(ctx, cx, cy, radius) {
+        const u = this.playerStats;  // topology source
+        const nodes = [
+            { name: 'ATK',     value: u.ATK,     color: '#ff6b6b' },
+            { name: 'SPEED',   value: u.SPEED,   color: '#ffd93d' },
+            { name: 'HP',      value: u.HP,       color: '#6bcb77' },
+            { name: 'ARMOR',   value: u.ARMOR,   color: '#4d96ff' },
+            { name: 'SPECIAL', value: u.SPECIAL, color: '#c77dff' },
+            { name: 'RANGE',   value: u.RANGE,   color: '#ff9f1c' },
+            { name: 'VIEW',    value: u.VIEW,    color: '#00f5d4' },
+        ];
+
+        const N = nodes.length;
+        const maxValue = 10; // 10次加点 = 满格，超过会 clamp 到边缘
+
+        ctx.save();
+        ctx.translate(cx, cy);
+
+        // 背景半透明底盘
+        ctx.beginPath();
+        for (let i = 0; i < N; i++) {
+            const angle = -Math.PI / 2 + i * (2 * Math.PI / N);
+            const x = Math.cos(angle) * radius;
+            const y = Math.sin(angle) * radius;
+            i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(0,0,0,0.45)';
+        ctx.fill();
+
+        // 网格圈（3层）
+        ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+        ctx.lineWidth = 1;
+        for (let ring = 1; ring <= 3; ring++) {
+            ctx.beginPath();
+            for (let i = 0; i < N; i++) {
+                const angle = -Math.PI / 2 + i * (2 * Math.PI / N);
+                const r = radius * (ring / 3);
+                const x = Math.cos(angle) * r;
+                const y = Math.sin(angle) * r;
+                i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            }
+            ctx.closePath();
+            ctx.stroke();
+        }
+
+        // 轴线
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+        for (let i = 0; i < N; i++) {
+            const angle = -Math.PI / 2 + i * (2 * Math.PI / N);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
+            ctx.stroke();
+        }
+
+        // 数值形状（glow effect）
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = 'rgba(120,200,255,0.5)';
+        ctx.beginPath();
+        for (let i = 0; i < N; i++) {
+            const normalized = Math.min(nodes[i].value / maxValue, 1);
+            const angle = -Math.PI / 2 + i * (2 * Math.PI / N);
+            const r = radius * normalized;
+            const x = Math.cos(angle) * r;
+            const y = Math.sin(angle) * r;
+            i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(120,200,255,0.25)';
+        ctx.strokeStyle = 'rgba(120,200,255,0.9)';
+        ctx.lineWidth = 2;
+        ctx.fill();
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        // 节点 + 标签
+        this.radarNodes = [];
+        for (let i = 0; i < N; i++) {
+            const node = nodes[i];
+            const angle = -Math.PI / 2 + i * (2 * Math.PI / N);
+            const x = Math.cos(angle) * radius;
+            const y = Math.sin(angle) * radius;
+
+            // 记录世界坐标供 hover 检测
+            this.radarNodes.push({ name: node.name, x: cx + x, y: cy + y, radius: 10 });
+
+            const isHovered = node.name === this.hoveredNode;
+            const dotRadius = isHovered ? 7 : 4;
+
+            ctx.shadowBlur = isHovered ? 15 : 6;
+            ctx.shadowColor = node.color;
+            ctx.fillStyle = node.color;
+            ctx.beginPath();
+            ctx.arc(x, y, dotRadius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // hover 时显示数值
+            ctx.fillStyle = isHovered ? node.color : '#ffffff';
+            ctx.font = isHovered ? 'bold 9px monospace' : '9px monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.fillText(node.name, x, y + 8);
+            if (isHovered) {
+                ctx.fillStyle = 'rgba(255,255,255,0.85)';
+                ctx.font = '9px monospace';
+                ctx.fillText(`×${node.value}`, x, y + 18);
+            }
+        }
+
+        // 展开时显示中心详情
+        if (this.radarExpanded) {
+            this.drawRadarCenterInfo(ctx, 0, 0);
+        }
+
+        ctx.restore();
+    }
+
+    drawRadarCenterInfo(ctx, cx, cy) {
+        if (!this.hoveredNode) {
+            // 无 hover 时显示默认提示
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = 'rgba(255,255,255,0.25)';
+            ctx.font = '10px monospace';
+            ctx.fillText('hover a node', cx, cy);
+            return;
+        }
+
+        const stat = this.hoveredNode;
+        const upgrades = this.playerStats[stat];
+
+        // 各属性的描述与每次加点效果
+        const info = {
+            ATK:     { desc: '伤害输出',   per: '+1 ATK / 点' },
+            SPEED:   { desc: '射击频率',   per: '+0.3 速度 / 点' },
+            HP:      { desc: '生存能力',   per: '+5 最大HP / 点' },
+            ARMOR:   { desc: '减伤比例',   per: '+5% 减伤 / 点' },
+            SPECIAL: { desc: '暴击率',     per: '+2% 暴击 / 点' },
+            RANGE:   { desc: '攻击范围',   per: '+25 射程 / 点' },
+            VIEW:    { desc: '视野范围',   per: '+30 视野 / 点' },
+        };
+
+        const colors = {
+            ATK:'#ff6b6b', SPEED:'#ffd93d', HP:'#6bcb77',
+            ARMOR:'#4d96ff', SPECIAL:'#c77dff', RANGE:'#ff9f1c', VIEW:'#00f5d4'
+        };
+
+        const color = colors[stat];
+        const { desc, per } = info[stat] || { desc: '', per: '' };
+
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        // 属性名
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = color;
+        ctx.fillStyle = color;
+        ctx.font = 'bold 16px monospace';
+        ctx.fillText(stat, cx, cy - 22);
+        ctx.shadowBlur = 0;
+
+        // 加点次数
+        ctx.fillStyle = 'rgba(120,200,255,0.95)';
+        ctx.font = 'bold 22px monospace';
+        ctx.fillText(`+${upgrades}`, cx, cy + 2);
+
+        // 描述
+        ctx.fillStyle = 'rgba(255,255,255,0.55)';
+        ctx.font = '9px monospace';
+        ctx.fillText(desc, cx, cy + 22);
+        ctx.fillText(per, cx, cy + 34);
+
+        ctx.restore();
+    }
+
+    drawBar(x, y, width, height, ratio, color) {
+        const clamped = Math.max(0, Math.min(1, ratio || 0));
+        ctx.fillStyle = 'rgba(0,0,0,0.45)';
+        ctx.fillRect(x, y, width, height);
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y, width * clamped, height);
+    }
+
+    drawTurretBars() {
+        const x = this.turret.x - 36;
+        const y = this.turret.y - 56;
+        const width = 72;
+
+        const hpRatio = this.turret.stats.maxHp > 0 ? (this.turret.stats.hp / this.turret.stats.maxHp) : 0;
+        this.drawBar(x, y, width, 5, hpRatio, '#6bcb77');
+
+        const shield = this.turret.shield;
+        if (shield.max > 0) {
+            const ratio = shield.current / shield.max;
+            this.drawBar(x, y + 8, width, 4, ratio, '#44aaff');
+        }
+    }
+
+    setText(key, el, value) {
+        if (this.uiState[key] !== value) {
+            this.uiState[key] = value;
+            el.textContent = value;
+        }
+    }
+
+    updateUI() {
+        const hpText = `❤️ HP: ${Math.ceil(this.turret.stats.hp)}/${this.turret.stats.maxHp}`;
+        let glow = this.currentRegenRate || this.getRegenRate();
+        if (this.regenSuppressed) glow *= 0.3;
+        const glowPx = Math.max(2, Math.min(14, glow * 6));
+        this.ui.hp.style.textShadow = `0 0 ${glowPx}px ${this.regenSuppressed ? '#ffaa44' : '#6bcb77'}`;
+        this.ui.hp.style.color = this.regenSuppressed ? '#ffd1a3' : '#ffffff';
+
+        let hostileCount = 0;
+        this.enemies.forEach(e => { if (this.isHostile(e)) hostileCount++; });
+        const remainingEnemies = hostileCount + Math.max(0, this.enemiesToSpawn - this.enemiesSpawned);
+        const waveText = `🌊 Wave ${this.wave}`;
+        const enemyText = `👾 敌人 ${this.enemiesToSpawn} / 剩余 ${remainingEnemies}`;
+        const resourceText = 
+            `🔥 ATK:${this.collectedResources.atk || 0} | ` +
+            `⚡ SPD:${this.collectedResources.speed || 0} | ` +
+            `🛡️ ARM:${this.collectedResources.armor || 0} | ` +
+            `🧨 FLR:${this.flareCharges}`;
+
+        this.setText('hp', this.ui.hp, hpText);
+        this.setText('wave', this.ui.wave, waveText);
+        this.setText('enemyStatus', this.ui.enemyStatus, enemyText);
+        this.setText('statusResources', this.ui.statusResources, resourceText);
+        this.setText('currentWeapon', this.ui.currentWeapon, this.getWeaponName(this.getActiveWeapon()));
+        this.setText('statAtk', this.ui.statAtk, String(this.turret.stats.atk));
+        this.setText('statSpeed', this.ui.statSpeed, this.turret.stats.speed.toFixed(1));
+        this.setText('statHp', this.ui.statHp, `${Math.ceil(this.turret.stats.hp)}/${this.turret.stats.maxHp}`);
+        const armorReduction = Math.min(this.turret.stats.armor * 0.05, 0.75);
+        this.setText('statArmor', this.ui.statArmor, `${(armorReduction * 100).toFixed(0)}%`);
+        this.setText('statRange', this.ui.statRange, String(Math.round(this.getEffectiveCombatStats().range)));
+        this.setText('statView', this.ui.statView, `${this.getEffectiveView()}/${this.viewCap}`);
+        const critStats = this.computeCritStats(this.turret.stats.special || 0);
+        this.setText('statSpecial', this.ui.statSpecial, `${(critStats.critChance * 100).toFixed(0)}%`);
+        this.setText('weaponStatus', this.ui.weaponStatus, `🎯 ${this.getWeaponName(this.getActiveWeapon())}`);
+        this.ui.hp.style.top = `${this.turret.y + 38}px`;
+        this.ui.hp.style.left = `${this.turret.x}px`;
+        this.updateRelicUI();
+        this.updateKeystoneUI();  // 第7步：更新基石UI
+    }
+
+    showRelicReward() {
+        if (!this.lastRelicGained) return;
+
+        const stat = this.lastRelicGained;
+        const relic = this.metaRelics[stat];
+        const cost = this.relicUpgradeCost[relic.level] || "-";
+
+        const colors = {
+            ATK: "#ff6b6b",
+            SPEED: "#ffd93d",
+            HP: "#6bcb77",
+            ARMOR: "#4d96ff",
+            SPECIAL: "#c77dff",
+            RANGE: "#ff9f1c",
+            VIEW: "#00f5d4"
+        };
+
+        let text = 
+            `<span style='color:${colors[stat] || "#ffd93d"}'>${stat}</span> Relic +1<br>` +
+            `Lv${relic.level} (${relic.count}/${cost})`;
+
+        if (this.lastRelicUpgraded)
+            text += "<br><span style='color:#6bcb77'>✨ LEVEL UP!</span>";
+
+        this.ui.relicReward.innerHTML = text;
+    }
+
+    grantRelic() {
+        let total = 0;
+        for (let stat in this.runUpgrades) total += this.runUpgrades[stat];
+        if (total > 0) {
+            let roll = Math.random() * total;
+            let cumulative = 0;
+            for (let stat in this.runUpgrades) {
+                cumulative += this.runUpgrades[stat];
+                if (roll < cumulative) {
+                    this.metaRelics[stat].count += 1;
+                    this.lastRelicGained = stat;
+                    const beforeLevel = this.metaRelics[stat].level;
+                    this.tryUpgradeRelic(stat);
+                    const afterLevel = this.metaRelics[stat].level;
+                    this.lastRelicUpgraded = (afterLevel > beforeLevel);
+                    this.relicDirty = true;
+                    
+                    try { localStorage.setItem('metaRelics', JSON.stringify(this.metaRelics)); } catch(e) {}
+                    console.log(`[Relic] 获得 ${stat} 碎片, 当前:`, this.metaRelics[stat]);
+                    break;
+                }
+            }
+        }
+
+        // 10% 几率获得 keystone（按 type 权重：WEAPON 40% / TOPOLOGY 40% / GLOBAL 20%）
+        if (Math.random() < 0.10) {
+            const pools = { WEAPON: [], TOPOLOGY: [], GLOBAL: [] };
+            for (let id in this.keystones) {
+                if (!this.keystones[id] && this.keystoneDefs[id]) {
+                    pools[this.keystoneDefs[id].type]?.push(id);
+                }
+            }
+            // 加权随机选池
+            const roll = Math.random();
+            let pool;
+            if (roll < 0.40)      pool = pools.WEAPON;
+            else if (roll < 0.80) pool = pools.TOPOLOGY;
+            else                  pool = pools.GLOBAL;
+            // 若选中的池为空则 fallback 到所有未解锁
+            if (!pool || pool.length === 0) {
+                pool = [...pools.WEAPON, ...pools.TOPOLOGY, ...pools.GLOBAL];
+            }
+            if (pool.length > 0) {
+                this.grantKeystone(pool[Math.floor(Math.random() * pool.length)]);
+            }
+        }
+    }
+
+    tryUpgradeRelic(stat) {
+        const relic = this.metaRelics[stat];
+        const cost = this.relicUpgradeCost[relic.level];
+        if (cost > 0 && relic.count >= cost) {
+            relic.count -= cost;
+            relic.level += 1;
+            console.log(`[Relic] ${stat} 升级到 Lv${relic.level}!`);
+        }
+    }
+
+    applyRelics() {
+        try {
+            const saved = JSON.parse(localStorage.getItem('metaRelics'));
+            if (saved) {
+                // 防御性合并：只覆盖已知字段，避免旧存档缺字段导致 undefined
+                for (let key in this.metaRelics) {
+                    if (saved[key]) this.metaRelics[key] = saved[key];
+                }
+            }
+        } catch(e) {}
+
+        // 加载 keystones
+        try {
+            const saved = localStorage.getItem('keystones');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                Object.assign(this.keystones, parsed);
+            }
+        } catch(e) {}
+
+        for (let stat in this.metaRelics) {
+            const relic = this.metaRelics[stat];
+            if (relic.level <= 0) continue;
+            const multiplier = 1 + 0.6 * (relic.level - 1);
+            let bonus = 0;
+            switch (stat) {
+                case 'ATK':     bonus = 2 * multiplier;   break;
+                case 'SPEED':   bonus = 0.25 * multiplier; break;
+                case 'HP':      bonus = 15 * multiplier;  break;
+                case 'ARMOR':   bonus = 2 * multiplier;   break;
+                case 'SPECIAL': bonus = 2 * multiplier;   break;
+                case 'RANGE':   bonus = 20 * multiplier;  break;
+                case 'VIEW':    bonus = 40 * multiplier;  break;
+            }
+            if (stat === 'HP') {
+                this.turret.stats.maxHp += bonus;
+                this.turret.stats.hp += bonus;
+            } else if (stat === 'ATK') {
+                this.turret.stats.atk += bonus;
+            } else if (stat === 'SPEED') {
+                this.turret.stats.speed += bonus;
+            } else if (stat === 'ARMOR') {
+                this.turret.stats.armor += bonus;
+            } else if (stat === 'SPECIAL') {
+                this.turret.stats.special += bonus;
+            } else if (stat === 'RANGE') {
+                this.turret.stats.range += bonus;
+            } else if (stat === 'VIEW') {
+                this.turret.stats.view = Math.min(this.viewCap, this.turret.stats.view + bonus);
+            }
+        }
+        this.updateShieldStats();
+    }
+
+    updateRelicUI() {
+        if (!this.relicDirty) return;
+        this.relicDirty = false;
+        const colors = {
+            ATK:     '#ff6b6b',
+            SPEED:   '#ffd93d',
+            HP:      '#6bcb77',
+            ARMOR:   '#4d96ff',
+            SPECIAL: '#c77dff',
+            RANGE:   '#ff9f1c',
+            VIEW:    '#00f5d4'
+        };
+
+        let html = '';
+        for (let stat in this.metaRelics) {
+            const relic = this.metaRelics[stat];
+            if (relic.level <= 0 && relic.count <= 0) continue;
+            const cost = this.relicUpgradeCost[relic.level] || '✦MAX';
+            html +=
+                `<span style="color:${colors[stat]}">${stat}</span>` +
+                ` Lv${relic.level}` +
+                ` <span style="color:#888">(${relic.count}/${cost})</span><br>`;
+        }
+
+        if (html === '') html = '<span style="color:#555">尚无遗物</span>';
+        this.ui.relicList.innerHTML = html;
+    }
+
+    restart() { 
+        location.reload(); 
+    }
+}
+
+const game = new Game();
+</script>
+</body>
+</html>
