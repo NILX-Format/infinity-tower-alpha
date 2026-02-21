@@ -207,6 +207,9 @@
         <span class="auto-mode">🤖 Infinity Tower · 基石传承</span> | 自动战斗 | 波次升级 | 遗物永久成长
     </div>
 
+    <div id="versionLabel" style="position:absolute;top:6px;right:12px;font-size:12px;color:#888;font-family:monospace;z-index:100;pointer-events:none;">v0.2.0 alpha
+    </div>
+
 <script>
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -294,8 +297,9 @@ class Game {
                 current: 0,
                 radius: 0,
                 broken: false,
-                regenCooldown: 0,
-                regenCooldownMax: 300 // 5 seconds
+                rebuildProgress: 0,
+                rebuildRequired: 12,
+                state: "ACTIVE"
             }
         };
 
@@ -565,6 +569,9 @@ class Game {
                 }
             }
         });
+        this.loadRun();
+        this.updateShieldStats();
+        this.updateUI();
         this.loop();
     }
 
@@ -606,6 +613,7 @@ class Game {
         localStorage.removeItem('metaRelics');
         localStorage.removeItem('keystones');
         localStorage.removeItem('snapshotData');
+        localStorage.removeItem('infinityTowerSave');
 
         for (let stat in this.metaRelics) {
             this.metaRelics[stat].level = 0;
@@ -678,7 +686,63 @@ class Game {
         if (enemy.type === 'SCOUT' && this.hasKeystone('SIGNAL_ECHO')) {
             this.turret.stats.view = Math.min(this.viewCap, this.turret.stats.view + 5);
         }
+        if (this.turret.shield.state === "BROKEN") {
+            this.turret.shield.rebuildProgress++;
+            if (this.turret.shield.rebuildProgress >= this.turret.shield.rebuildRequired) {
+                this.turret.shield.state = "ACTIVE";
+                this.turret.shield.broken = false;
+                this.turret.shield.current = this.turret.shield.max;
+                this.turret.shield.rebuildProgress = 0;
+                this.createShieldRestoreEffect(this.turret.x, this.turret.y);
+            }
+        }
         // 未来新增 keystone 效果只需在这里加
+    }
+
+    saveRun() {
+        const data = {
+            wave: this.wave,
+            turretStats: this.turret.stats,
+            playerStats: this.playerStats,
+            runUpgrades: this.runUpgrades,
+            keystones: this.keystones,
+            metaRelics: this.metaRelics
+        };
+        localStorage.setItem("infinityTowerSave", JSON.stringify(data));
+    }
+
+    loadRun() {
+        const raw = localStorage.getItem("infinityTowerSave");
+        if (!raw) return;
+
+        let data = null;
+        try {
+            data = JSON.parse(raw);
+        } catch (_) {
+            return;
+        }
+        if (!data) return;
+
+        this.wave = data.wave || 1;
+        Object.assign(this.turret.stats, data.turretStats || {});
+        Object.assign(this.playerStats, data.playerStats || {});
+        Object.assign(this.runUpgrades, data.runUpgrades || {});
+        Object.assign(this.keystones, data.keystones || {});
+
+        if (data.metaRelics) {
+            for (const stat in this.metaRelics) {
+                if (data.metaRelics[stat]) this.metaRelics[stat] = data.metaRelics[stat];
+            }
+        }
+
+        this.wavePackets = this.generateWavePackets(this.wave);
+        this.currentPacket = 0;
+        this.packetEnemyIndex = 0;
+        this.packetTimer = 0;
+        this.enemiesSpawned = 0;
+        this.enemiesToSpawn = this.getTotalEnemiesFromPackets(this.wavePackets);
+        this.relicDirty = true;
+        this.keystoneDirty = true;
     }
 
     getTotalEnemiesFromPackets(packets) {
@@ -711,24 +775,31 @@ class Game {
 
         shield.max = Math.max(0, armorLevel * 12);
         shield.radius = this.turret.baseRadius + 40 + armorLevel * 3;
-        shield.regenCooldownMax = Math.max(120, 300 - armorLevel * 15);
 
         if (shield.max <= 0) {
             shield.current = 0;
             shield.broken = true;
-            shield.regenCooldown = 0;
+            shield.state = "BROKEN";
+            shield.rebuildProgress = 0;
             return;
         }
 
         if (prevMax <= 0 && shield.max > 0) {
             shield.broken = false;
+            shield.state = "ACTIVE";
             shield.current = shield.max;
-            shield.regenCooldown = 0;
+            shield.rebuildProgress = 0;
             return;
         }
 
-        if (!shield.broken) shield.current = shield.max;
-        else shield.current = Math.min(shield.current, shield.max);
+        if (shield.state !== "BROKEN") {
+            shield.state = "ACTIVE";
+            shield.broken = false;
+            shield.current = shield.max;
+        } else {
+            shield.broken = true;
+            shield.current = Math.min(shield.current, shield.max);
+        }
     }
 
     createShieldBreakEffect(x, y) {
@@ -1103,24 +1174,12 @@ class Game {
 
     getEffectiveCombatStats() {
         const s = this.turret.stats;
-        const baseATK = s.atk;
-        const baseSPEED = s.speed;
-        const baseRANGE = s.range;
-        const baseSPECIAL = s.special || 0;
-
-        if (s.weaponType === 'CANNON') {
-            return {
-                atk: baseATK + baseSPEED * 0.5,
-                speed: Math.max(0.1, baseSPEED * 0.5),
-                range: baseRANGE * 1.2,
-                splashRadius: 40 + baseSPECIAL * 2
-            };
-        }
-
+        const cooldownMultiplier = 1 / (1 + s.speed * 0.2);
         return {
-            atk: baseATK,
-            speed: baseSPEED,
-            range: baseRANGE,
+            atk: s.atk,
+            speed: s.speed,
+            range: s.range,
+            cooldownMultiplier,
             splashRadius: 0
         };
     }
@@ -1146,7 +1205,7 @@ class Game {
             isCannon: false
         });
         this.playShootSfx();
-        this.turret.cooldown = this.turret.stats.fireRate / effective.speed;
+        this.turret.cooldown = this.turret.stats.fireRate * effective.cooldownMultiplier;
     }
 
     fireLaser() {
@@ -1158,7 +1217,7 @@ class Game {
         
         this.createExplosion(this.turret.target.x, this.turret.target.y, '#4ecdc4', 2);
         this.playShootSfx();
-        this.turret.cooldown = 6;
+        this.turret.cooldown = 6 * effective.cooldownMultiplier;
         this.laserTimer = 5;
     }
 
@@ -1184,7 +1243,7 @@ class Game {
             weaponType: 'CANNON'
         });
         this.playShootSfx();
-        this.turret.cooldown = (this.turret.stats.fireRate * 3) / effective.speed;
+        this.turret.cooldown = (this.turret.stats.fireRate * 3) * effective.cooldownMultiplier;
     }
 
     autoShoot() {
@@ -1208,6 +1267,41 @@ class Game {
             case 'REFLECT_SHIELD':  this.fireWeapon_REFLECT_SHIELD();  break;
             default:                this.fireBullet();                  break;
         }
+        this.fireFallbackBullet();
+    }
+
+    fireFallbackBullet() {
+        if (!this.turret.target) return;
+
+        if (!this.fallbackCooldown)
+            this.fallbackCooldown = 0;
+
+        if (this.fallbackCooldown > 0) {
+            this.fallbackCooldown--;
+            return;
+        }
+
+        this.fallbackCooldown = 60;
+
+        const dmg = this.turret.stats.atk * 0.3;
+        const angle = Math.atan2(
+            this.turret.target.y - this.turret.y,
+            this.turret.target.x - this.turret.x
+        );
+
+        this.bullets.push({
+            x: this.turret.x,
+            y: this.turret.y,
+            vx: Math.cos(angle) * 6,
+            vy: Math.sin(angle) * 6,
+            damage: dmg,
+            radius: 2,
+            isFallback: true,
+            isCannon: false,
+            speed: 6,
+            distance: 0,
+            maxDistance: this.getAllowedRangeForTarget(this.turret.target, this.turret.stats.range)
+        });
     }
 
     // ===== Weapon Stubs（各自独立，之后逐个替换为真实行为）=====
@@ -1269,7 +1363,8 @@ class Game {
     fireWeapon_REFLECT_SHIELD() {
         // 被动武器：不主动开火，伤害反弹在 onHit 处理
         // 但仍需重置 cooldown 防止锁死
-        this.turret.cooldown = this.turret.stats.fireRate;
+        const effective = this.getEffectiveCombatStats();
+        this.turret.cooldown = this.turret.stats.fireRate * effective.cooldownMultiplier;
     }
 
     handleClick(e) {
@@ -1327,16 +1422,6 @@ class Game {
 
         if (this.suppressionHintCooldown > 0) {
             this.suppressionHintCooldown = Math.max(0, this.suppressionHintCooldown - dt);
-        }
-
-        const shield = this.turret.shield;
-        if (shield.broken && shield.max > 0) {
-            shield.regenCooldown = Math.max(0, shield.regenCooldown - dt);
-            if (shield.regenCooldown <= 0) {
-                shield.broken = false;
-                shield.current = shield.max;
-                this.createShieldRestoreEffect(this.turret.x, this.turret.y);
-            }
         }
 
         const deltaTime = dt / 60;
@@ -1413,7 +1498,7 @@ class Game {
 
         // priority 2: nearest enemy
         if (!target)
-            target = this.findNearestEnemy();
+            target = this.findNearestVisibleEnemy();
 
         this.turret.target = target;
 
@@ -1556,7 +1641,8 @@ class Game {
                         if (shield.current <= 0) {
                             shield.current = 0;
                             shield.broken = true;
-                            shield.regenCooldown = shield.regenCooldownMax;
+                            shield.state = "BROKEN";
+                            shield.rebuildProgress = 0;
                             this.createShieldBreakEffect(this.turret.x, this.turret.y);
                         }
                         e.attackTimer = e.attackCooldown;
@@ -1804,6 +1890,7 @@ class Game {
 
         if (allSpawned && allDead) {
             console.log(`Wave ${this.wave} 完成`);
+            this.saveRun();
             this.waveTransitioning = true;
             this.isPaused = true;
             
@@ -1973,6 +2060,28 @@ class Game {
                 nearest = enemy;
             }
         });
+
+        return nearest;
+    }
+
+    findNearestVisibleEnemy() {
+        let nearest = null;
+        let minDist = Infinity;
+
+        for (const e of this.enemies) {
+            if (e.hp <= 0) continue;
+            if (!this.isPositionRevealed(e.x, e.y)) continue;
+
+            const d = Math.hypot(
+                e.x - this.turret.x,
+                e.y - this.turret.y
+            );
+
+            if (d < minDist) {
+                minDist = d;
+                nearest = e;
+            }
+        }
 
         return nearest;
     }
@@ -2609,17 +2718,7 @@ class Game {
             ctx.restore();
         });
 
-        const shield = this.turret.shield;
-        if (!shield.broken && shield.current > 0 && shield.max > 0) {
-            const ratio = shield.current / shield.max;
-            ctx.save();
-            ctx.strokeStyle = `rgba(80,160,255,${0.3 + ratio * 0.7})`;
-            ctx.lineWidth = 4;
-            ctx.beginPath();
-            ctx.arc(this.turret.x, this.turret.y, shield.radius, 0, Math.PI * 2);
-            ctx.stroke();
-            ctx.restore();
-        }
+        this.drawArmorArc(ctx);
         
         ctx.save();
         ctx.translate(this.turret.x, this.turret.y);
@@ -2906,12 +3005,26 @@ class Game {
 
         const hpRatio = this.turret.stats.maxHp > 0 ? (this.turret.stats.hp / this.turret.stats.maxHp) : 0;
         this.drawBar(x, y, width, 5, hpRatio, '#6bcb77');
+    }
 
+    drawArmorArc(ctx) {
         const shield = this.turret.shield;
-        if (shield.max > 0) {
-            const ratio = shield.current / shield.max;
-            this.drawBar(x, y + 8, width, 4, ratio, '#44aaff');
-        }
+        if (shield.current <= 0 || shield.max <= 0) return;
+
+        const ratio = shield.current / shield.max;
+        ctx.save();
+        ctx.strokeStyle = `rgba(80,180,255,${0.4 + ratio * 0.6})`;
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.arc(
+            this.turret.x,
+            this.turret.y,
+            shield.radius,
+            Math.PI * 0.25,
+            Math.PI * 0.75
+        );
+        ctx.stroke();
+        ctx.restore();
     }
 
     setText(key, el, value) {
