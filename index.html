@@ -2262,6 +2262,12 @@ class Game {
             if (t.life <= 0) this.floatingTexts.splice(i, 1);
         }
 
+        // ⚗️ Enemy fusion — cap at 150 live hostiles
+        const liveHostiles = this.enemies.filter(e => this.isHostile(e)).length;
+        if (liveHostiles > 150) {
+            this.fuseClosestEnemies();
+        }
+
         // 🎯 波次完成检测
         this.checkWaveComplete();
         
@@ -2273,6 +2279,105 @@ class Game {
             !enemy.dead &&
             enemy.faction === "ENEMY"
         );
+    }
+
+    // ═══════════════════════════════════════
+    // ⚗️  ENEMY FUSION SYSTEM
+    // ═══════════════════════════════════════
+
+    fuseClosestEnemies() {
+        // only fuse hostile, non-converted enemies; skip bosses (they're already apex)
+        const candidates = this.enemies.filter(e =>
+            this.isHostile(e) && !e.isConverted && e.type !== 'BOSS'
+        );
+        if (candidates.length < 2) return;
+
+        let bestA = null, bestB = null, bestDist = Infinity;
+
+        for (let i = 0; i < candidates.length; i++) {
+            for (let j = i + 1; j < candidates.length; j++) {
+                const a = candidates[i], b = candidates[j];
+                const dx = a.x - b.x, dy = a.y - b.y;
+                const d2 = dx * dx + dy * dy;
+                if (d2 < bestDist) { bestDist = d2; bestA = a; bestB = b; }
+            }
+        }
+
+        if (!bestA || !bestB) return;
+        this.createFusedEnemy(bestA, bestB);
+
+        // remove originals
+        [bestA, bestB].forEach(e => {
+            const idx = this.enemies.indexOf(e);
+            if (idx !== -1) this.enemies.splice(idx, 1);
+        });
+    }
+
+    createFusedEnemy(a, b) {
+        const fusionLevel = (a.fusionLevel || 0) + (b.fusionLevel || 0) + 1;
+
+        // derive a blended color — lerp toward magenta the deeper the fusion
+        const fusionT    = Math.min(fusionLevel / 5, 1); // saturates at lv 5
+        const baseColor  = a.color; // keep the heavier unit's color as base
+
+        const newEnemy = {
+            x: (a.x + b.x) * 0.5,
+            y: (a.y + b.y) * 0.5,
+
+            hp:    (a.hp    + b.hp)    * 1.2,
+            maxHp: (a.maxHp + b.maxHp) * 1.2,
+
+            damage:       Math.max(a.damage, b.damage) * 1.1,
+            radius:       Math.sqrt(a.radius * a.radius + b.radius * b.radius),
+            speed:        Math.min(a.speed, b.speed) * 0.9,
+
+            // inherit heavier unit's type/color, then override visually
+            type:         a.maxHp >= b.maxHp ? a.type : b.type,
+            color:        baseColor,
+            reward:       a.reward, // carried forward for relic drops
+
+            faction:      "ENEMY",
+            entityType:   "COMBAT",
+            state:        "MOVING",
+
+            attackWindup:  Math.min(a.attackWindup  || 30, b.attackWindup  || 30),
+            attackTimer:   Math.min(a.attackTimer   || 30, b.attackTimer   || 30),
+            attackCooldown:Math.min(a.attackCooldown|| 60, b.attackCooldown|| 60),
+            attackRange:   Math.sqrt(a.radius * a.radius + b.radius * b.radius) + 35,
+
+            isConverted:        false,
+            conversionProgress: 0,
+            originalHP:         (a.hp + b.hp) * 1.2,
+            originalSpeed:      Math.min(a.speed, b.speed) * 0.9,
+
+            // fusion metadata (drives visuals)
+            fused:       true,
+            fusionLevel,
+            fusionT,     // 0→1 colour-shift intensity
+            fusionPulse: 0,  // animates on spawn
+        };
+
+        this.enemies.push(newEnemy);
+        this.createFusionEffect(newEnemy.x, newEnemy.y, fusionLevel);
+    }
+
+    createFusionEffect(x, y, level = 1) {
+        // burst of magenta particles
+        const count = 12 + level * 4;
+        for (let i = 0; i < count; i++) {
+            const angle  = (Math.PI * 2 / count) * i;
+            const speed  = 1.5 + Math.random() * 2;
+            this.particles.push({
+                x, y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                color: level >= 3 ? '#ff0088' : '#cc44ff',
+                life: 30 + Math.floor(Math.random() * 20)
+            });
+        }
+        // floating text
+        const label = level >= 4 ? '⚗️ APEX FUSION' : level >= 2 ? '⚗️ FUSED' : '⚗️';
+        this.spawnFloatingText(x, y - 24, label, '#cc44ff', 1.1);
     }
 
     checkWaveComplete() {
@@ -3321,6 +3426,60 @@ class Game {
             ctx.beginPath(); 
             ctx.arc(e.x, e.y, e.radius, 0, Math.PI*2); 
             ctx.fill();
+
+            // ── Fusion visual overlay ──────────────────────────────
+            if (e.fused) {
+                const fl = e.fusionLevel || 1;
+
+                // outer pulsing glow ring
+                if (e.fusionPulse === undefined) e.fusionPulse = 0;
+                e.fusionPulse = (e.fusionPulse + 0.06) % (Math.PI * 2);
+                const pulseR = e.radius + 4 + Math.sin(e.fusionPulse) * 3;
+                const glowAlpha = 0.55 + 0.3 * Math.sin(e.fusionPulse);
+
+                ctx.save();
+                ctx.shadowBlur  = 14 + fl * 3;
+                ctx.shadowColor = fl >= 4 ? '#ff0088' : '#cc44ff';
+                ctx.strokeStyle = fl >= 4
+                    ? `rgba(255,0,136,${glowAlpha})`
+                    : `rgba(180,60,255,${glowAlpha})`;
+                ctx.lineWidth   = 2.5;
+                ctx.beginPath();
+                ctx.arc(e.x, e.y, pulseR, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.shadowBlur  = 0;
+                ctx.restore();
+
+                // segmented fusion-level rings (1 notch per fusion level, like shield)
+                const segs    = Math.min(fl, 6);
+                const gap     = 0.12;
+                const arcSpan = (Math.PI * 2 - gap * segs) / segs;
+                const ringR   = e.radius + 10 + fl;
+                ctx.save();
+                ctx.lineWidth = 2;
+                for (let s = 0; s < segs; s++) {
+                    const sa = -Math.PI / 2 + s * (arcSpan + gap);
+                    ctx.beginPath();
+                    ctx.arc(e.x, e.y, ringR, sa, sa + arcSpan);
+                    ctx.strokeStyle = fl >= 4 ? '#ff44aa' : '#dd66ff';
+                    ctx.stroke();
+                }
+                ctx.restore();
+
+                // fusion level badge (small numeral above enemy)
+                if (fl >= 2) {
+                    ctx.save();
+                    ctx.font      = `bold ${9 + fl}px monospace`;
+                    ctx.fillStyle = '#ffffff';
+                    ctx.textAlign = 'center';
+                    ctx.shadowBlur  = 4;
+                    ctx.shadowColor = '#cc44ff';
+                    ctx.fillText(`F${fl}`, e.x, e.y - e.radius - 14);
+                    ctx.shadowBlur  = 0;
+                    ctx.restore();
+                }
+            }
+            // ─────────────────────────────────────────────────────
 
             this.renderTopologyOverlay(e);
 
