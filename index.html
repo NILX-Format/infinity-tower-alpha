@@ -206,7 +206,7 @@
         <span class="auto-mode">🤖 Infinity Tower · 基石传承</span> | 自动战斗 | 波次升级 | 遗物永久成长
     </div>
 
-    <div id="versionLabel" style="position:absolute;top:6px;right:12px;font-size:12px;color:#888;font-family:monospace;z-index:100;pointer-events:none;">v0.5.0 alpha
+    <div id="versionLabel" style="position:absolute;top:6px;right:12px;font-size:12px;color:#888;font-family:monospace;z-index:100;pointer-events:none;">v0.6.0 alpha
     </div>
 
     <div id="mainMenu" style="
@@ -239,7 +239,7 @@
     <br><br>
 
     <div style="font-size:12px;color:#777">
-    v0.5.0 a
+    v0.6.0 a
     </div>
 
     </div>
@@ -368,6 +368,7 @@ class Game {
         this.flareMax = 3;
         this.activeFlares = [];
         this.bioFields = [];
+        this.activeBeams = [];
         this.flareConfig = {
             radius: 140,
             durationWaves: 1
@@ -1359,8 +1360,32 @@ class Game {
     // ===== Weapon Stubs（各自独立，之后逐个替换为真实行为）=====
 
     fireWeapon_LASER() {
-        // TODO: 真实行为 - 持续光束，穿透，高频
-        this.fireLaser();
+        if (!this.turret.target) return;
+
+        const target = this.turret.target;
+
+        const effective =
+            this.getEffectiveCombatStats();
+
+        const damage =
+            effective.atk * effective.tickMultiplier * 0.3;
+
+        target.hp -= damage;
+
+        this.activeBeams.push({
+
+            x1: this.turret.x,
+            y1: this.turret.y,
+
+            x2: target.x,
+            y2: target.y,
+
+            life: 6
+
+        });
+
+        this.turret.cooldown =
+            6 * effective.cooldownMultiplier;
     }
 
     fireWeapon_INCENDIARY() {
@@ -1878,8 +1903,7 @@ class Game {
 
         // BIO field update
         this.bioFields.forEach(field => {
-
-            field.duration--;
+            if (field.life <= 0) return;
 
             this.enemies.forEach(enemy => {
 
@@ -1904,9 +1928,6 @@ class Game {
             });
 
         });
-
-        // remove expired fields
-        this.bioFields = this.bioFields.filter(f => f.duration > 0);
 
         // floating texts update
         for (let i = this.floatingTexts.length - 1; i >= 0; i--) {
@@ -2061,10 +2082,10 @@ class Game {
     createBioField(x, y) {
 
         this.bioFields.push({
-            x: x,
-            y: y,
-            radius: 90,
-            duration: 600
+            x,
+            y,
+            radius: 40,
+            life: 180
         });
 
     }
@@ -2665,6 +2686,76 @@ class Game {
         });
     }
 
+    drawBeams(ctx)
+    {
+        for (let i =
+            this.activeBeams.length - 1;
+            i >= 0;
+            i--)
+        {
+            const beam =
+                this.activeBeams[i];
+
+            ctx.strokeStyle =
+                "#ffd93d";
+
+            ctx.lineWidth = 3;
+
+            ctx.beginPath();
+
+            ctx.moveTo(
+                beam.x1,
+                beam.y1
+            );
+
+            ctx.lineTo(
+                beam.x2,
+                beam.y2
+            );
+
+            ctx.stroke();
+
+            beam.life--;
+
+            if (beam.life <= 0)
+                this.activeBeams.splice(i,1);
+        }
+    }
+
+    drawBioFields(ctx)
+    {
+        for (let i =
+            this.bioFields.length - 1;
+            i >= 0;
+            i--)
+        {
+            const f =
+                this.bioFields[i];
+
+            ctx.strokeStyle =
+                "#6bcb77";
+
+            ctx.lineWidth = 2;
+
+            ctx.beginPath();
+
+            ctx.arc(
+                f.x,
+                f.y,
+                f.radius,
+                0,
+                Math.PI*2
+            );
+
+            ctx.stroke();
+
+            f.life--;
+
+            if (f.life <= 0)
+                this.bioFields.splice(i,1);
+        }
+    }
+
     drawGameObjects() {
         const effective = this.getEffectiveCombatStats();
         if (this.laserTimer > 0 && this.turret.target) {
@@ -2679,12 +2770,24 @@ class Game {
             ctx.shadowBlur = 0;
         }
         
-        this.bullets.forEach(b => {
-            ctx.fillStyle = b.color || (b.isCannon ? '#ff9f43' : '#ffd93d');
+        this.bullets.forEach(bullet => {
+            ctx.fillStyle =
+                bullet.isFallback
+                ? "#6a7a8a"
+                : "#ffffff";
+
+            ctx.globalAlpha =
+                bullet.isFallback
+                ? 0.4
+                : 1;
+
             ctx.beginPath(); 
-            ctx.arc(b.x, b.y, b.radius, 0, Math.PI*2); 
+            ctx.arc(bullet.x, bullet.y, bullet.radius, 0, Math.PI*2); 
             ctx.fill();
         });
+        ctx.globalAlpha = 1;
+        this.drawBeams(ctx);
+        this.drawBioFields(ctx);
 
         this.enemies.forEach(e => {
             const distToTurret = Math.hypot(e.x - this.turret.x, e.y - this.turret.y);
@@ -2733,23 +2836,6 @@ class Game {
         
         ctx.globalAlpha = 1;
         
-        // BIO field render
-        this.bioFields.forEach(field => {
-
-            ctx.save();
-
-            ctx.globalAlpha = 0.2;
-
-            ctx.fillStyle = "rgba(80,255,180,0.25)";
-
-            ctx.beginPath();
-            ctx.arc(field.x, field.y, field.radius, 0, Math.PI*2);
-            ctx.fill();
-
-            ctx.restore();
-
-        });
-
         this.particles.forEach(p => {
             if (this.isPositionRevealed(p.x, p.y)) {
                 ctx.globalAlpha = Math.max(0, p.life / 30);
