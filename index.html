@@ -454,6 +454,17 @@ class Game {
         this.lastManifestType = null;
         this.laserFlash = 0;
 
+        // ===== State Caps System =====
+        this.statCaps = {
+        ATK: Infinity,
+        SPEED: Infinity,
+        HP: Infinity,
+        ARMOR: Infinity,
+        SPECIAL: Infinity,
+        RANGE: Infinity,
+        VIEW: 600
+        };
+
         // ===== Enemy Role System =====
         this.ENEMY_TYPES = {
             normal: { hp: 100, speed: 1.0, damage: 1.0, radius: 15, color: '#ff6b6b', reward: 'atk', attackCooldown: 60 },
@@ -2659,7 +2670,16 @@ class Game {
         btnContainer.innerHTML = '';
         
         const choices = [];
-        const pool = [...this.upgradeOptions];
+        // Map option key → stat key for cap checking
+        const optKeyToStatKey = { atk: 'ATK', speed: 'SPEED', maxHp: 'HP', armor: 'ARMOR', special: 'SPECIAL', range: 'RANGE', view: 'VIEW' };
+        const pool = this.upgradeOptions.filter(opt => {
+            const statKey = optKeyToStatKey[opt.key];
+            return !statKey || !this.isStatCapped(statKey);
+        });
+        // Fallback: if somehow all capped, at least show SPECIAL
+        if (pool.length === 0) {
+            pool.push({ key: 'special', label: '✨ 特殊 +1', value: 1, desc: '提升暴击率' });
+        }
         
         for(let i=0; i<3; i++) {
             if (pool.length === 0) break;
@@ -2708,6 +2728,16 @@ class Game {
             'SNIPER':         '🎯 狙击枪'
         };
         return names[type] || type;
+    }
+
+    isStatCapped(statKey) {
+        const cap = this.statCaps[statKey];
+        if (cap === undefined || cap === Infinity) return false;
+        // Map stat keys (ATK, VIEW…) to turret stat property names
+        const propMap = { ATK: 'atk', SPEED: 'speed', HP: 'maxHp', ARMOR: 'armor', SPECIAL: 'special', RANGE: 'range', VIEW: 'view' };
+        const prop = propMap[statKey];
+        if (!prop) return false;
+        return (this.turret.stats[prop] || 0) >= cap;
     }
 
     applyUpgrade(opt) {
@@ -3725,7 +3755,9 @@ class Game {
         const armorReduction = Math.min(this.turret.stats.armor * 0.05, 0.75);
         this.setText('statArmor', this.ui.statArmor, `${(armorReduction * 100).toFixed(0)}%`);
         this.setText('statRange', this.ui.statRange, String(Math.round(this.getEffectiveCombatStats().range)));
-        this.setText('statView', this.ui.statView, `${this.getEffectiveView()}/${this.viewCap}`);
+        const viewVal = this.getEffectiveView();
+        const viewText = this.isStatCapped('VIEW') ? `${viewVal} (MAX)` : `${viewVal}/${this.viewCap}`;
+        this.setText('statView', this.ui.statView, viewText);
         const critStats = this.computeCritStats(this.turret.stats.special || 0);
         this.setText('statSpecial', this.ui.statSpecial, `${(critStats.critChance * 100).toFixed(0)}%`);
         this.setText('weaponStatus', this.ui.weaponStatus, `🎯 ${this.getWeaponName(this.getActiveWeapon())}`);
