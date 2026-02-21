@@ -217,19 +217,31 @@
     transform:translate(-50%,-50%);
     text-align:center;
     color:white;
-    font-family:monospace;
-    z-index:200;
+    font-family:'Courier New',monospace;
+    z-index:500;
+    background:rgba(0,0,0,0.85);
+    padding:30px 40px;
+    border-radius:10px;
+    border:1px solid #444;
     ">
 
-    <h1>Infinity Tower</h1>
+    <h1 style="margin-top:0">Infinity Tower</h1>
 
-    <button onclick="game.continueRun()">Continue Run</button>
+    <button id="continueBtn">Continue Run</button>
     <br><br>
 
-    <button onclick="game.newRun()">New Run</button>
+    <button id="newRunBtn">New Run</button>
     <br><br>
 
-    <button onclick="game.resetProgress()">Reset Progress</button>
+    <button id="resetBtn" style="color:#ff6b6b">
+    Reset Progress
+    </button>
+
+    <br><br>
+
+    <div style="font-size:12px;color:#777">
+    v0.3.0 alpha
+    </div>
 
     </div>
 
@@ -592,7 +604,7 @@ class Game {
                 }
             }
         });
-        this.showMainMenu();
+        // this.loop();
     }
 
     showMainMenu() {
@@ -3295,7 +3307,48 @@ class Game {
     }
 }
 
-const game = new Game();
+let game = null;
+
+function startGame(loadSave)
+{
+    document.getElementById("mainMenu").style.display = "none";
+
+    game = new Game();
+
+    if (loadSave)
+        game.loadRun();
+
+    game.updateShieldStats();
+    game.updateUI();
+    game.isPaused = false;
+    game.loop();
+}
+
+document.getElementById("continueBtn").onclick = () =>
+{
+    startGame(true);
+};
+
+document.getElementById("newRunBtn").onclick = () =>
+{
+    localStorage.removeItem("infinityTowerSave");
+    startGame(false);
+};
+
+document.getElementById("resetBtn").onclick = () =>
+{
+    if(confirm("Reset ALL progress?"))
+    {
+        localStorage.clear();
+        location.reload();
+    }
+};
+
+if (!localStorage.getItem("infinityTowerSave"))
+{
+    document.getElementById("continueBtn").disabled = true;
+    document.getElementById("continueBtn").style.opacity = 0.5;
+}
 </script>
 </body>
 </html>
