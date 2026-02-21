@@ -2,136 +2,233 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <title>Infinity Tower · 基石遗物</title>
     <style>
-        :root { --ui-scale: 1.15; }
-        body {
-            margin: 0; padding: 0; background: #1a1a2e;
-            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
-            height: 100vh; font-family: 'Courier New', monospace; color: #eee; overflow: hidden;
+        :root { --ui-scale: 1; }
+
+        *, *::before, *::after { box-sizing: border-box; }
+
+        html, body {
+            margin: 0; padding: 0;
+            width: 100%; height: 100%;
+            background: #1a1a2e;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            font-family: 'Courier New', monospace; color: #eee;
+            overflow: hidden;
+            touch-action: manipulation;
+            -webkit-text-size-adjust: 100%;
+            -webkit-tap-highlight-color: transparent;
         }
+
         #gameContainer {
-            position: relative; box-shadow: 0 0 50px rgba(0, 255, 255, 0.2);
-            transform-origin: top center;
+            position: relative;
+            box-shadow: 0 0 50px rgba(0, 255, 255, 0.2);
+            /* size driven by JS via canvas CSS width/height */
+            flex-shrink: 0;
         }
+
         canvas {
-            border: 3px solid #16213e; background: #0f0f23; display: block;
+            border: 2px solid #16213e;
+            background: #0f0f23;
+            display: block;
+            /* JS sets width/height style to scale to viewport */
         }
+
         #ui {
             position: absolute; top: 10px; left: 10px; right: 10px;
             display: flex; justify-content: space-between; pointer-events: none;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
         }
+
         .stat {
-            background: rgba(0,0,0,0.6); padding: 8px 15px; border-radius: 5px;
-            border: 1px solid #444; font-size: calc(14px * var(--ui-scale));
+            background: rgba(0,0,0,0.6); padding: 6px 10px; border-radius: 5px;
+            border: 1px solid #444; font-size: calc(12px * var(--ui-scale));
+            white-space: nowrap;
         }
+
         #hp {
             color: #ff6b6b; font-weight: bold; position: absolute; left: 50%;
             transform: translateX(-50%); pointer-events: none; z-index: 2;
             font-size: calc(11px * var(--ui-scale)); letter-spacing: 0.5px;
             text-align: center; white-space: nowrap;
         }
+
         #wave { color: #4ecdc4; }
         #weaponStatus { color: #ffd93d; }
         #enemyStatus { color: #a8f0ff; }
+
         #speedControls {
-            position: absolute; bottom: 10px; left: 10px; display: flex; gap: 5px;
+            position: absolute; bottom: 10px; left: 10px;
+            display: flex; gap: 4px; flex-wrap: nowrap;
         }
+
         #speedControls button {
-            padding: 5px 10px; font-size: calc(12px * var(--ui-scale)); cursor: pointer;
-            background: #333; color: white; border: 1px solid #555; border-radius: 3px;
+            padding: 6px 10px;
+            font-size: calc(11px * var(--ui-scale));
+            cursor: pointer;
+            background: #333; color: white;
+            border: 1px solid #555; border-radius: 3px;
             pointer-events: auto;
+            min-height: 44px; min-width: 44px;
+            touch-action: manipulation;
         }
-        #speedControls button:hover { background: #444; }
+        #speedControls button:hover  { background: #444; }
         #speedControls button.active { background: #2a5a4a; border-color: #4ecdc4; color: #4ecdc4; font-weight: bold; }
-        #muteBtn { min-width: 36px; }
+        #muteBtn { min-width: 44px; font-size: calc(14px * var(--ui-scale)); }
         #muteBtn.muted { color: #ff6b6b; border-color: #ff6b6b; }
+
         #statusDock {
-            position: absolute; bottom: 10px; right: 10px; display: flex;
-            flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: auto;
+            position: absolute; bottom: 10px; right: 10px;
+            display: flex; flex-direction: column; align-items: flex-end;
+            gap: 6px; pointer-events: auto;
         }
+
         #statusToggle {
-            background: rgba(0,0,0,0.6); padding: 8px 14px; border-radius: 5px;
-            border: 1px solid #444; color: #ffd93d; font-size: calc(12px * var(--ui-scale));
+            background: rgba(0,0,0,0.6); padding: 8px 12px; border-radius: 5px;
+            border: 1px solid #444; color: #ffd93d;
+            font-size: calc(12px * var(--ui-scale));
             margin: 0; cursor: pointer;
+            min-height: 44px; touch-action: manipulation;
         }
+
         #statusPanel {
-            width: 230px; background: rgba(0,0,0,0.88); border: 1px solid #444;
+            width: min(230px, 55vw);
+            background: rgba(0,0,0,0.92); border: 1px solid #444;
             border-radius: 8px; padding: 10px 12px; display: none;
+            font-size: calc(12px * var(--ui-scale));
+            max-height: 60vh; overflow-y: auto;
         }
         #statusPanel.open { display: block; }
+
         #gameOver, #victory {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            text-align: center; display: none; background: rgba(0,0,0,0.9);
-            padding: 30px; border-radius: 10px; border: 2px solid; pointer-events: auto;
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center; display: none;
+            background: rgba(0,0,0,0.92);
+            padding: 24px; border-radius: 10px; border: 2px solid;
+            pointer-events: auto;
+            max-width: 88vw; max-height: 80vh; overflow-y: auto;
+            width: min(360px, 88vw);
         }
-        #gameOver { border-color: #ff6b6b; color: #ff6b6b; }
-        #victory { border-color: #4ecdc4; color: #4ecdc4; }
+        #gameOver  { border-color: #ff6b6b; color: #ff6b6b; }
+        #victory   { border-color: #4ecdc4; color: #4ecdc4; }
+
         button {
-            margin-top: 15px; padding: 10px 20px; font-size: calc(16px * var(--ui-scale));
-            cursor: pointer; background: #333; color: white; border: 2px solid #555;
-            border-radius: 5px; font-family: inherit;
+            margin-top: 12px; padding: 10px 18px;
+            font-size: calc(14px * var(--ui-scale));
+            cursor: pointer; background: #333; color: white;
+            border: 2px solid #555; border-radius: 5px;
+            font-family: inherit; min-height: 44px;
+            touch-action: manipulation;
         }
         button:hover { background: #444; border-color: #777; }
+
         #instructions {
-            margin-top: 12px; color: #888; font-size: calc(14px * var(--ui-scale));
-            text-align: center;
+            margin-top: 8px; color: #888;
+            font-size: calc(12px * var(--ui-scale));
+            text-align: center; padding: 0 8px;
         }
         .auto-mode { color: #4ecdc4; font-weight: bold; }
+
         #upgradePanel {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.95); border: 3px solid #4ecdc4; border-radius: 10px;
-            padding: 30px; display: none; color: #eee; text-align: center;
-            pointer-events: auto; min-width: 300px; box-shadow: 0 0 30px rgba(78,205,196,0.3);
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.97); border: 3px solid #4ecdc4;
+            border-radius: 10px; padding: 20px 16px;
+            display: none; color: #eee; text-align: center;
+            pointer-events: auto;
+            width: min(340px, 90vw);
+            max-height: 85vh; overflow-y: auto;
+            box-shadow: 0 0 30px rgba(78,205,196,0.3);
         }
-        #upgradeTitle { margin-top: 0; color: #4ecdc4; font-size: calc(24px * var(--ui-scale)); }
-        .stat-display { margin: 15px 0; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 5px; }
-        .stat-row { display: flex; justify-content: space-between; margin: 5px 0; font-size: calc(14px * var(--ui-scale)); }
-        #upgradeButtons { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+        #upgradeTitle { margin-top: 0; color: #4ecdc4; font-size: calc(20px * var(--ui-scale)); }
+
+        .stat-display { margin: 10px 0; padding: 8px; background: rgba(255,255,255,0.05); border-radius: 5px; }
+        .stat-row {
+            display: flex; justify-content: space-between; margin: 4px 0;
+            font-size: calc(12px * var(--ui-scale));
+        }
+
+        #upgradeButtons { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
         #upgradeButtons button {
-            margin: 0; padding: 15px; font-size: calc(14px * var(--ui-scale));
-            background: linear-gradient(135deg, #2c3e50, #34495e); border: 1px solid #4ecdc4;
-            color: #4ecdc4; transition: all 0.3s;
+            margin: 0; padding: 12px 10px;
+            font-size: calc(13px * var(--ui-scale));
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            border: 1px solid #4ecdc4; color: #4ecdc4;
+            transition: all 0.2s; min-height: 52px;
         }
         #upgradeButtons button:hover {
-            background: linear-gradient(135deg, #34495e, #4ecdc4); color: #fff; transform: translateX(5px);
+            background: linear-gradient(135deg, #34495e, #4ecdc4);
+            color: #fff; transform: translateX(4px);
         }
-        .weapon-indicator { margin-top: 15px; padding: 10px; background: rgba(78,205,196,0.1); border-radius: 5px; border:1px solid #4ecdc4; }
+        .weapon-indicator {
+            margin-top: 12px; padding: 8px;
+            background: rgba(78,205,196,0.1);
+            border-radius: 5px; border: 1px solid #4ecdc4;
+            font-size: calc(12px * var(--ui-scale));
+        }
 
         #resetProgressBtn {
-            position: absolute;
-            left: 10px;
-            bottom: 50px;
-            padding: 5px 10px;
-            font-size: 11px;
-            background: rgba(80,0,0,0.7);
-            color: #ff6b6b;
-            border: 1px solid #ff6b6b;
-            border-radius: 3px;
-            cursor: pointer;
-            pointer-events: auto;
-            margin: 0;
-            font-family: monospace;
-            z-index: 10;
+            position: absolute; left: 10px; bottom: 58px;
+            padding: 5px 10px; font-size: calc(10px * var(--ui-scale));
+            background: rgba(80,0,0,0.7); color: #ff6b6b;
+            border: 1px solid #ff6b6b; border-radius: 3px;
+            cursor: pointer; pointer-events: auto;
+            margin: 0; font-family: monospace; z-index: 10;
+            min-height: 36px; touch-action: manipulation;
         }
         #resetProgressBtn:hover { background: rgba(150,0,0,0.8); }
+
         #relicPanel {
-            position:absolute; right:10px; top:120px; width:180px; background:rgba(0,0,0,0.6);
-            color:white; padding:10px; font-family:monospace; font-size:12px;
-            border:1px solid rgba(255,255,255,0.2); border-radius:6px; pointer-events:none;
+            position: absolute; right: 10px; top: 70px;
+            width: min(160px, 38vw);
+            background: rgba(0,0,0,0.65); color: white;
+            padding: 8px; font-family: monospace;
+            font-size: calc(10px * var(--ui-scale));
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 6px; pointer-events: none;
         }
         #keystonePanel {
-            position:absolute; right:10px; top:280px; width:180px; background:rgba(0,0,0,0.7);
-            color:#c77dff; padding:10px; font-family:monospace; font-size:12px;
-            border:1px solid #c77dff; border-radius:6px; pointer-events:none;
+            position: absolute; right: 10px; top: 220px;
+            width: min(160px, 38vw);
+            background: rgba(0,0,0,0.75); color: #c77dff;
+            padding: 8px; font-family: monospace;
+            font-size: calc(10px * var(--ui-scale));
+            border: 1px solid #c77dff; border-radius: 6px; pointer-events: none;
         }
         #relicReward, #keystoneReward {
-            margin-top:10px; font-family:monospace; font-size:calc(14px * var(--ui-scale));
-            line-height:1.5; text-shadow:0 0 5px #000;
+            margin-top: 10px; font-family: monospace;
+            font-size: calc(13px * var(--ui-scale));
+            line-height: 1.5; text-shadow: 0 0 5px #000;
         }
-        #keystoneReward { color:#c77dff; }
+        #keystoneReward { color: #c77dff; }
+
+        /* Main menu */
+        #mainMenu {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center; color: white;
+            font-family: 'Courier New', monospace;
+            z-index: 500;
+            background: rgba(0,0,0,0.9);
+            padding: 28px 32px; border-radius: 10px;
+            border: 1px solid #444;
+            width: min(320px, 88vw);
+            max-height: 90vh; overflow-y: auto;
+        }
+        #mainMenu h1 { font-size: calc(22px * var(--ui-scale)); margin-top: 0; }
+        #mainMenu button { width: 100%; margin-top: 10px; }
+        #continueInfo { font-size: calc(11px * var(--ui-scale)); color: #4ecdc4; margin-top: 4px; min-height: 16px; }
+
+        #versionLabel {
+            position: absolute; top: 6px; right: 12px;
+            font-size: calc(10px * var(--ui-scale));
+            color: #888; font-family: monospace; z-index: 100; pointer-events: none;
+        }
     </style>
 </head>
 <body>
@@ -212,23 +309,10 @@
         <span class="auto-mode">🤖 Infinity Tower · 基石传承</span> | 自动战斗 | 波次升级 | 遗物永久成长
     </div>
 
-    <div id="versionLabel" style="position:absolute;top:6px;right:12px;font-size:12px;color:#888;font-family:monospace;z-index:100;pointer-events:none;">v1.3.6 alpha
+    <div id="versionLabel" style="position:absolute;top:6px;right:12px;font-size:12px;color:#888;font-family:monospace;z-index:100;pointer-events:none;">v1.3.7 alpha
     </div>
 
-    <div id="mainMenu" style="
-    position:absolute;
-    top:50%;
-    left:50%;
-    transform:translate(-50%,-50%);
-    text-align:center;
-    color:white;
-    font-family:'Courier New',monospace;
-    z-index:500;
-    background:rgba(0,0,0,0.85);
-    padding:30px 40px;
-    border-radius:10px;
-    border:1px solid #444;
-    ">
+    <div id="mainMenu">
 
     <h1 style="margin-top:0">Infinity Tower</h1>
 
@@ -247,7 +331,7 @@
     <br><br>
 
     <div style="font-size:12px;color:#777">
-    v1.3.6 a
+    v1.3.7 a
     </div>
 
     </div>
@@ -317,6 +401,10 @@ class AudioManager
 
 class Game {
     constructor() {
+        // ===== Base resolution (internal canvas coords never change) =====
+        this.baseWidth  = 760;
+        this.baseHeight = 1080;
+
         // ===== 空间拓扑定义 =====
         this.zones = {
             spawnTop: canvas.height * 0.15,
@@ -697,7 +785,12 @@ class Game {
         this.updateShieldStats();
         this.updateUI();
         this.updateContainerScale();
-        canvas.addEventListener('click', (e) => this.handleClick(e));
+        canvas.addEventListener('click',     (e) => this.handleClick(e));
+        canvas.addEventListener('touchend',  (e) => {
+            e.preventDefault();
+            const t = e.changedTouches[0];
+            this.handleClick({ clientX: t.clientX, clientY: t.clientY });
+        }, { passive: false });
         canvas.addEventListener('pointerdown', () => this.resumeAudio());
         canvas.addEventListener('mousemove', (e) => {
             const rect = canvas.getBoundingClientRect();
@@ -1422,15 +1515,30 @@ class Game {
     updateContainerScale() {
         const viewportW = window.innerWidth;
         const viewportH = window.innerHeight;
-        const instructionH = this.ui.instructions ? this.ui.instructions.offsetHeight : 32;
-        const horizontalPadding = 64;
-        const topPadding = 16;
-        const bottomPadding = 20;
-        const availW = Math.max(320, viewportW - horizontalPadding);
-        const availH = Math.max(320, viewportH - instructionH - topPadding - bottomPadding);
-        const fitScale = Math.min(availW / canvas.width, availH / canvas.height);
-        const scale = Math.min(1, fitScale * 0.96);
-        this.ui.gameContainer.style.transform = `scale(${scale})`;
+
+        // fit canvas inside viewport maintaining 760×1080 aspect ratio
+        const scale = Math.max(0.45, Math.min(
+            viewportW  / 760,
+            viewportH  / 1080
+        ));
+
+        const cssW = Math.floor(760  * scale);
+        const cssH = Math.floor(1080 * scale);
+
+        // scale CSS display size; keep internal resolution fixed at 760×1080
+        canvas.style.width  = cssW + 'px';
+        canvas.style.height = cssH + 'px';
+
+        // drive all calc(Xpx * var(--ui-scale)) values
+        const uiScale = Math.max(0.6, scale);
+        document.documentElement.style.setProperty('--ui-scale', uiScale);
+
+        // gameContainer matches canvas
+        this.ui.gameContainer.style.width  = cssW + 'px';
+        this.ui.gameContainer.style.height = cssH + 'px';
+
+        // clear any old transform-based scaling
+        this.ui.gameContainer.style.transform = '';
     }
 
     resumeAudio() {
