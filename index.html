@@ -331,7 +331,6 @@ class Game {
                 max: 0,
                 current: 0,
                 radius: 0,
-                broken: false,
                 rebuildProgress: 0,
                 rebuildRequired: 12,
                 state: "ACTIVE"
@@ -751,7 +750,6 @@ class Game {
             this.turret.shield.rebuildProgress++;
             if (this.turret.shield.rebuildProgress >= this.turret.shield.rebuildRequired) {
                 this.turret.shield.state = "ACTIVE";
-                this.turret.shield.broken = false;
                 this.turret.shield.current = this.turret.shield.max;
                 this.turret.shield.rebuildProgress = 0;
                 this.createShieldRestoreEffect(this.turret.x, this.turret.y);
@@ -839,14 +837,12 @@ class Game {
 
         if (shield.max <= 0) {
             shield.current = 0;
-            shield.broken = true;
             shield.state = "BROKEN";
             shield.rebuildProgress = 0;
             return;
         }
 
         if (prevMax <= 0 && shield.max > 0) {
-            shield.broken = false;
             shield.state = "ACTIVE";
             shield.current = shield.max;
             shield.rebuildProgress = 0;
@@ -855,10 +851,8 @@ class Game {
 
         if (shield.state !== "BROKEN") {
             shield.state = "ACTIVE";
-            shield.broken = false;
             shield.current = shield.max;
         } else {
-            shield.broken = true;
             shield.current = Math.min(shield.current, shield.max);
         }
     }
@@ -1235,13 +1229,13 @@ class Game {
 
     getEffectiveCombatStats() {
         const s = this.turret.stats;
-        const cooldownMultiplier = 1 / (1 + s.speed * 0.2);
+        const speedFactor = 1 + s.speed * 0.25;
         return {
             atk: s.atk,
             speed: s.speed,
             range: s.range,
-            cooldownMultiplier,
-            splashRadius: 0
+            cooldownMultiplier: 1 / speedFactor,
+            tickMultiplier: speedFactor
         };
     }
 
@@ -1658,7 +1652,7 @@ class Game {
                     const shield = this.turret.shield;
                     const distToTurret = Math.hypot(this.turret.x - e.x, this.turret.y - e.y);
 
-                    if (!shield.broken && shield.current > 0 && distToTurret <= shield.radius) {
+                    if (shield.state !== "BROKEN" && shield.current > 0 && distToTurret <= shield.radius) {
                         if (e.state !== "ATTACKING_SHIELD") {
                             e.state = "ATTACKING_SHIELD";
                             e.attackTimer = e.attackWindup;
@@ -1701,7 +1695,6 @@ class Game {
                         shield.current -= damage;
                         if (shield.current <= 0) {
                             shield.current = 0;
-                            shield.broken = true;
                             shield.state = "BROKEN";
                             shield.rebuildProgress = 0;
                             this.createShieldBreakEffect(this.turret.x, this.turret.y);
@@ -1711,7 +1704,7 @@ class Game {
                     }
 
                     this.turret.stats.hp -= damage;
-                    if (this.turret.shield.broken) {
+                    if (this.turret.shield.state === "BROKEN") {
                         this.regenSuppressionTimer = this.regenSuppressionDuration;
                         this.regenSuppressed = true;
                         if (this.suppressionHintCooldown <= 0) {
@@ -2128,15 +2121,16 @@ class Game {
     findNearestVisibleEnemy() {
         let nearest = null;
         let minDist = Infinity;
+        const view = this.getEffectiveView();
 
         for (const e of this.enemies) {
             if (e.hp <= 0) continue;
-            if (!this.isPositionRevealed(e.x, e.y)) continue;
 
             const d = Math.hypot(
                 e.x - this.turret.x,
                 e.y - this.turret.y
             );
+            if (d > view) continue;
 
             if (d < minDist) {
                 minDist = d;
