@@ -513,6 +513,49 @@
 
         </div>
 
+        <!-- RAILGUN 功率控制（仅 RAILGUN 武器时显示）-->
+        <div id="railgunControls" style="
+            display: none;
+            position: absolute;
+            top: 70px;
+            left: 20px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            z-index: 100;
+        ">
+            <div id="railPowerDown" style="
+                width: 28px; height: 28px;
+                border-radius: 6px;
+                background: rgba(255,100,50,0.12);
+                border: 1px solid rgba(255,100,50,0.35);
+                color: #ff9f1c;
+                font-size: 16px;
+                display: flex; align-items: center; justify-content: center;
+                cursor: pointer; font-family: monospace;
+                user-select: none;
+            ">−</div>
+            <div id="railPowerLabel" style="
+                color: #ff9f1c;
+                font-family: monospace;
+                font-size: 11px;
+                letter-spacing: 1px;
+                min-width: 44px;
+                text-align: center;
+            ">PWR 1/5</div>
+            <div id="railPowerUp" style="
+                width: 28px; height: 28px;
+                border-radius: 6px;
+                background: rgba(255,100,50,0.12);
+                border: 1px solid rgba(255,100,50,0.35);
+                color: #ff9f1c;
+                font-size: 16px;
+                display: flex; align-items: center; justify-content: center;
+                cursor: pointer; font-family: monospace;
+                user-select: none;
+            ">+</div>
+        </div>
+
         <div id="combatHUD">
             <div id="waveLabel">WAVE 1</div>
             <div id="xpBarContainer">
@@ -871,6 +914,39 @@ class Game {
             this.autoEnabled = !this.autoEnabled;
             autoBtn.classList.toggle("active", this.autoEnabled);
         });
+
+        // RAILGUN 功率控制按钮
+        const railControls = document.getElementById('railgunControls');
+        const railLabel    = document.getElementById('railPowerLabel');
+
+        const updateRailLabel = () => {
+            const r = this.railgunState;
+            if (railLabel) railLabel.textContent = `PWR ${r.chargeLevel}/${r.maxCharge}`;
+            railLabel.style.color = r.chargeLevel === r.maxCharge ? '#ff4422' : '#ff9f1c';
+        };
+
+        document.getElementById('railPowerDown').addEventListener('click', () => {
+            const r = this.railgunState;
+            if (r.chargeLevel > 1) { r.chargeLevel--; updateRailLabel(); }
+        });
+
+        document.getElementById('railPowerUp').addEventListener('click', () => {
+            const r = this.railgunState;
+            if (r.chargeLevel < r.maxCharge) { r.chargeLevel++; updateRailLabel(); }
+        });
+
+        // 武器切换时 show/hide 功率控制
+        this._prevWeapon = null;
+        const checkRailgunUI = () => {
+            const w = this.getActiveWeapon ? this.getActiveWeapon() : null;
+            if (w !== this._prevWeapon) {
+                this._prevWeapon = w;
+                if (railControls) railControls.style.display = w === 'RAILGUN' ? 'flex' : 'none';
+                updateRailLabel();
+            }
+        };
+        // 每帧轮询武器状态（轻量）
+        setInterval(checkRailgunUI, 200);
         
         this.systemOpen = false;
         
@@ -1019,6 +1095,24 @@ class Game {
             baseDamageMult: 1.4,
             falloff:        0.78,
             cooldownMult:   1.3
+        };
+        this.railgunState = {
+            chargeLevel:  1,
+            maxCharge:    5,
+            baseCooldown: 120,
+            cooldown:     0
+        };
+        this.sniperState = {
+            ammo:           1,
+            maxAmmo:        1,
+            reloadTime:     210,
+            reloadTimer:    0,
+            isReloading:    false,
+            recoilCooldown: 0
+        };
+        this.sniperConfig = {
+            deadZone:   600,
+            bonusRange: 600
         };
         this.lastPlasmaTarget = null;
         this.floatingTexts = [];
@@ -2266,13 +2360,14 @@ class Game {
         );
         const allowedRange = this.getAllowedRangeForTarget(this.turret.target, effective.range);
         if (dist > allowedRange) return;
-        
+        // Extended Ballistics (RNG-T1-A): 弹体射程+50%
+        const rangeBonus = this.isModifierActive('RNG-T1-A') ? 1.5 : 1.0;
         const angle = Math.atan2(this.turret.target.y - this.turret.y, this.turret.target.x - this.turret.x);
         this.bullets.push({
             x: this.turret.x, y: this.turret.y,
             vx: Math.cos(angle) * 7, vy: Math.sin(angle) * 7,
             damage: effective.atk,
-            distance: 0, maxDistance: allowedRange,
+            distance: 0, maxDistance: allowedRange * rangeBonus,
             radius: 3,
             speed: 7,
             isCannon: false
@@ -2346,6 +2441,10 @@ class Game {
     fireFallbackWeapon() {
         if (!this.turret.target) return;
 
+        // RAILGUN / SNIPER 有独立节奏，不叠加 fallback
+        const w = this.getActiveWeapon();
+        if (w === 'RAILGUN' || w === 'SNIPER') return;
+
         if (this.fallbackCooldown > 0) {
             this.fallbackCooldown--;
             return;
@@ -2357,6 +2456,8 @@ class Game {
             this.turret.target.x - this.turret.x
         );
         const damage = this.turret.stats.atk * 0.30;
+        // Extended Ballistics (RNG-T1-A): 射程+50%
+        const rangeBonus = this.isModifierActive('RNG-T1-A') ? 1.5 : 1.0;
 
         this.bullets.push({
             x: this.turret.x,
@@ -2370,7 +2471,7 @@ class Game {
             isCannon: false,
             speed: 6,
             distance: 0,
-            maxDistance: this.getAllowedRangeForTarget(this.turret.target, this.turret.stats.range)
+            maxDistance: this.getAllowedRangeForTarget(this.turret.target, this.turret.stats.range) * rangeBonus
         });
     }
 
@@ -2449,53 +2550,44 @@ class Game {
     //  SNIPER
     // ══════════════════════════════════════════
     fireWeapon_SNIPER() {
-        const target = this.findSniperTarget();
+        const s = this.sniperState;
+        if (s.ammo <= 0) return;
+        if (s.recoilCooldown > 0) return;
+
+        const minRange = this.sniperConfig.deadZone;
+        const maxRange = this.turret.stats.range + this.sniperConfig.bonusRange;
+
+        const target = this.getSniperTarget(minRange, maxRange);
         if (!target) return;
 
+        s.ammo--;
+        s.recoilCooldown = 90;
+
+        if (!s.isReloading) {
+            s.isReloading = true;
+            s.reloadTimer = s.reloadTime;
+        }
+
+        const dx   = target.x - this.turret.x;
+        const dy   = target.y - this.turret.y;
+        const dist = Math.hypot(dx, dy);
+
+        const distanceFactor = 1 + ((dist - minRange) / 600) * 1.2;
+
+        let damage = this.turret.stats.atk * 3.0 * distanceFactor;
+
+        if (!target.sniperTagged) {
+            damage *= 1.5;
+            target.sniperTagged = true;
+        }
+
+        const penetration = Math.min(3, 1 + Math.floor((this.playerStats.VIEW || 0) / 3));
+
+        this.spawnSniperBullet(target, damage, penetration);
+
+        // cooldown 只阻塞 autoShoot，真实射速由 recoilCooldown 控制
         const effective = this.getEffectiveCombatStats();
-        const dist = Math.hypot(target.x - this.turret.x, target.y - this.turret.y);
-        if (dist < 600) return;  // 只打远目标
-
-        const viewBonus = 1 + (this.turret.stats.view / 200);
-        const damage    = effective.atk * 2.5 * viewBonus;
-
-        const angle = Math.atan2(target.y - this.turret.y, target.x - this.turret.x);
-        const speed = 18;
-
-        this.bullets.push({
-            x: this.turret.x, y: this.turret.y,
-            vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
-            damage,
-            distance: 0, maxDistance: this.turret.stats.view * 1.2,
-            radius: 4,
-            speed,
-            type: 'SNIPER',
-            viewBonus,
-            hitEnemies: [],
-            trailParticles: []
-        });
-
-        // 准星标记目标
-        target.sniperTargeted = 30;
-
-        // 音效：尖锐短促
-        this.audio.playTone(1200, 0.08, 0.06, 'sawtooth');
-        this.audio.playTone(600,  0.15, 0.04, 'sine');
-
-        this.turret.cooldown = 150 * effective.cooldownMultiplier;
-    }
-
-    findSniperTarget() {
-        let best = null, maxDist = -Infinity;
-        this.enemies.forEach(e => {
-            if (!this.isHostile(e)) return;
-            const dist = Math.hypot(e.x - this.turret.x, e.y - this.turret.y);
-            if (dist > this.turret.stats.view) return;
-            const threshold = this.turret.stats.view * 0.8;
-            if (dist < threshold) return;  // 太近的不打
-            if (dist > maxDist) { maxDist = dist; best = e; }
-        });
-        return best;
+        this.turret.cooldown = 2 * effective.cooldownMultiplier;
     }
 
     updateSniperBullets(dt) {
@@ -2534,11 +2626,72 @@ class Game {
         }
     }
 
+    updateSniperReload() {
+        const s = this.sniperState;
+        if (!s.isReloading) return;
+        s.reloadTimer--;
+        if (s.reloadTimer <= 0) {
+            if (s.ammo < s.maxAmmo) {
+                s.ammo++;
+                s.reloadTimer = s.reloadTime;
+            }
+            if (s.ammo >= s.maxAmmo) {
+                s.isReloading = false;
+            }
+        }
+    }
+
+    updateSniperRecoil() {
+        const s = this.sniperState;
+        if (s.recoilCooldown > 0) s.recoilCooldown--;
+    }
+
+    getSniperTarget(minRange, maxRange) {
+        let best = null, bestDist = 0;
+        for (const e of this.enemies) {
+            if (!this.isHostile(e)) continue;
+            const dist = Math.hypot(e.x - this.turret.x, e.y - this.turret.y);
+            if (dist < minRange) continue;
+            if (dist > maxRange) continue;
+            if (dist > bestDist) { bestDist = dist; best = e; }
+        }
+        return best;
+    }
+
+    spawnSniperBullet(target, damage, penetration) {
+        const angle = Math.atan2(target.y - this.turret.y, target.x - this.turret.x);
+        const speed = 18;
+        const maxRange = this.turret.stats.range + this.sniperConfig.bonusRange;
+        const rangeBonus = this.isModifierActive('RNG-T1-A') ? 1.5 : 1.0;
+
+        this.bullets.push({
+            x: this.turret.x, y: this.turret.y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            damage,
+            distance: 0,
+            maxDistance: maxRange * rangeBonus,
+            radius: 4,
+            speed,
+            type: 'SNIPER',
+            hitEnemies: [],
+            trailParticles: [],
+            penetration,           // 最大穿透数
+            penetrationsLeft: penetration
+        });
+
+        // 准星标记
+        target.sniperTargeted = 30;
+
+        // 音效
+        this.audio.playTone(1200, 0.08, 0.06, 'sawtooth');
+        this.audio.playTone(600,  0.15, 0.04, 'sine');
+    }
     drawSniperBullets(ctx) {
         this.bullets.forEach(b => {
             if (b.type !== 'SNIPER') return;
 
-            // 轨迹
+            // 轨迹粒子
             b.trailParticles.forEach(p => {
                 const alpha = p.life / 14;
                 ctx.fillStyle = `rgba(0,245,212,${alpha * 0.7})`;
@@ -2589,104 +2742,144 @@ class Game {
         });
     }
 
+    drawSniperAmmo(ctx) {
+        if (this.getActiveWeapon() !== 'SNIPER') return;
+        const s     = this.sniperState;
+        const baseX = this.turret.x;
+        const baseY = this.turret.y + 30;
+
+        ctx.save();
+        for (let i = 0; i < s.maxAmmo; i++) {
+            const offset = (i - (s.maxAmmo - 1) / 2) * 14;
+            ctx.beginPath();
+            ctx.arc(baseX + offset, baseY, 5, 0, Math.PI * 2);
+            if (i < s.ammo) {
+                ctx.shadowBlur  = 6;
+                ctx.shadowColor = '#00f5d4';
+                ctx.fillStyle   = '#ffffff';
+                ctx.fill();
+            } else {
+                ctx.shadowBlur  = 0;
+                ctx.strokeStyle = '#555555';
+                ctx.stroke();
+            }
+            ctx.closePath();
+        }
+
+        // 装填进度弧（弹药为0时显示）
+        if (s.ammo === 0 && s.isReloading) {
+            const progress = 1 - (s.reloadTimer / s.reloadTime);
+            ctx.strokeStyle = 'rgba(0,245,212,0.5)';
+            ctx.lineWidth   = 2;
+            ctx.shadowBlur  = 0;
+            ctx.beginPath();
+            ctx.arc(baseX, baseY, 10, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress);
+            ctx.stroke();
+        }
+
+        ctx.restore();
+    }
     // ══════════════════════════════════════════
-    //  RAILGUN
+    // ══════════════════════════════════════════
+    //  RAILGUN V2 — 可调毁灭炮
     // ══════════════════════════════════════════
     fireWeapon_RAILGUN() {
-        if (!this.turret.railgunState) {
-            this.turret.railgunState = { phase: 'READY', chargeTimer: 0 };
+        const r = this.railgunState;
+        if (r.cooldown > 0) {
+            // 在 CD 中占住 turret.cooldown 防止 autoShoot 退出
+            this.turret.cooldown = 2;
+            return;
         }
-        // 实际发射由 updateRailgunCharge() 驱动，这里只触发蓄能
-        const state = this.turret.railgunState;
-        if (state.phase === 'READY' && this.turret.target && this.turret.cooldown <= 0) {
-            state.phase = 'CHARGING';
-            state.chargeTimer = 90;
-        }
-        // 占住 cooldown 防止 autoShoot 反复调用
-        this.turret.cooldown = 1;
+
+        const level = r.chargeLevel;
+        const damageMultiplier   = 1 + 0.25 * (level - 1);
+        const rangeMultiplier    = 1 + 0.20 * (level - 1);
+        const cooldownMultiplier = 1 + 0.35 * (level - 1);
+
+        const effectiveRange = this.turret.stats.range * rangeMultiplier;
+        const target = this.getTargetInRange(effectiveRange);
+        if (!target) return;
+
+        const damage = this.turret.stats.atk * 4.0 * damageMultiplier;
+        const isMax  = (level === r.maxCharge);
+
+        this.fireRailgunBeam(target, damage, effectiveRange, isMax);
+
+        r.cooldown = Math.round(r.baseCooldown * cooldownMultiplier);
+        // 占住 turret.cooldown 让 autoShoot 等 railgun CD 结束
+        this.turret.cooldown = r.cooldown;
     }
 
-    updateRailgunCharge(dt) {
-        if (this.getActiveWeapon() !== 'RAILGUN') return;
-        if (!this.turret.railgunState) {
-            this.turret.railgunState = { phase: 'READY', chargeTimer: 0 };
-        }
-        const state = this.turret.railgunState;
-
-        switch (state.phase) {
-            case 'READY':
-                if (this.turret.target && this.turret.cooldown <= 0) {
-                    state.phase = 'CHARGING';
-                    state.chargeTimer = 90;
-                }
-                break;
-
-            case 'CHARGING':
-                state.chargeTimer -= dt;
-                if (!this.turret.target) { state.phase = 'READY'; state.chargeTimer = 0; break; }
-                if (state.chargeTimer <= 0) {
-                    state.phase = 'FIRING';
-                    this.executeRailgunFire();
-                }
-                break;
-
-            case 'FIRING':
-                state.phase = 'COOLDOWN';
-                break;
-
-            case 'COOLDOWN':
-                if (this.turret.cooldown <= 0) state.phase = 'READY';
-                break;
-        }
+    updateRailgunCooldown() {
+        const r = this.railgunState;
+        if (r.cooldown > 0) r.cooldown--;
     }
 
-    executeRailgunFire() {
-        if (!this.turret.target) return;
-        const angle      = Math.atan2(this.turret.target.y - this.turret.y, this.turret.target.x - this.turret.x);
-        const beamLength = 380;
-        const beamWidth  = 30;
-        const endX = this.turret.x + Math.cos(angle) * beamLength;
-        const endY = this.turret.y + Math.sin(angle) * beamLength;
+    getTargetInRange(range) {
+        // 复用现有 turret.target（已经由 targeting 系统选好），只检查射程
+        const t = this.turret.target;
+        if (!t) return null;
+        const dist = Math.hypot(t.x - this.turret.x, t.y - this.turret.y);
+        return dist <= range ? t : null;
+    }
 
-        const effective = this.getEffectiveCombatStats();
-        const baseDamage = effective.atk * 1.8;
+    fireRailgunBeam(target, damage, beamLength, isMax) {
+        const angle    = Math.atan2(target.y - this.turret.y, target.x - this.turret.x);
+        const rngBonus = this.isModifierActive('RNG-T1-A') ? 1.5 : 1.0;
+        const length   = beamLength * rngBonus;
+        const beamWidth = 30;
+        const endX = this.turret.x + Math.cos(angle) * length;
+        const endY = this.turret.y + Math.sin(angle) * length;
 
+        // 收集穿透目标（先收集，再处理，避免 splice 乱序）
+        const hitList = [];
         this.enemies.forEach(e => {
-            const dist        = this.pointToLineDistance(e.x, e.y, this.turret.x, this.turret.y, endX, endY);
-            const toAngle     = Math.atan2(e.y - this.turret.y, e.x - this.turret.x);
-            let   angleDiff   = Math.abs(toAngle - angle);
+            const dist       = this.pointToLineDistance(e.x, e.y, this.turret.x, this.turret.y, endX, endY);
+            const toAngle    = Math.atan2(e.y - this.turret.y, e.x - this.turret.x);
+            let   angleDiff  = Math.abs(toAngle - angle);
             if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
-            const fromTurret  = Math.hypot(e.x - this.turret.x, e.y - this.turret.y);
-
-            if (dist < beamWidth / 2 + e.radius && fromTurret < beamLength && angleDiff < Math.PI / 4) {
-                const result = this.applyDamageWithCrit(baseDamage, e);
-                e.hp -= result.damage;
-                this.createExplosion(e.x, e.y, '#ff9f1c', 6);
-                if (e.hp <= 0) {
-                    this.onEnemyKilled(e);
-                    this.handleScoutDefeat(e);
-                    this.collectedResources[e.reward] = (this.collectedResources[e.reward] || 0) + 1;
-                    this.createExplosion(e.x, e.y, e.color, 8);
-                    const idx = this.enemies.indexOf(e);
-                    if (idx !== -1) this.enemies.splice(idx, 1);
-                }
+            const fromTurret = Math.hypot(e.x - this.turret.x, e.y - this.turret.y);
+            if (dist < beamWidth / 2 + e.radius && fromTurret < length && angleDiff < Math.PI / 4) {
+                hitList.push(e);
             }
         });
 
-        this.activeBeams.push({
-            type: 'RAILGUN',
-            x1: this.turret.x, y1: this.turret.y,
-            x2: endX, y2: endY,
-            width: beamWidth,
-            life: 20, maxLife: 20,
-            color: '#ff9f1c'
+        hitList.forEach(e => {
+            // 满格：忽略护盾
+            let finalDamage = damage;
+            if (isMax) {
+                finalDamage += (e.shield || 0); // 穿透护盾
+            }
+            const result = this.applyDamageWithCrit(finalDamage, e);
+            e.hp -= result.damage;
+            this.createExplosion(e.x, e.y, '#ff9f1c', isMax ? 10 : 6);
+            if (e.hp <= 0) {
+                this.onEnemyKilled(e);
+                this.handleScoutDefeat(e);
+                this.collectedResources[e.reward] = (this.collectedResources[e.reward] || 0) + 1;
+                this.createExplosion(e.x, e.y, e.color, 8);
+                const idx = this.enemies.indexOf(e);
+                if (idx !== -1) this.enemies.splice(idx, 1);
+            }
         });
 
-        // 音效 + 震屏
-        this.audio.playTone(60,  0.5,  0.10, 'square');
-        this.audio.playTone(200, 0.25, 0.05, 'sawtooth');
-        this.screenShake = 15;
-        this.turret.cooldown = 240;
+        // 满格：更宽更亮的 beam
+        this.activeBeams.push({
+            type:    'RAILGUN',
+            x1: this.turret.x, y1: this.turret.y,
+            x2: endX, y2: endY,
+            width:   isMax ? 50 : 30,
+            life:    isMax ? 28 : 20,
+            maxLife: isMax ? 28 : 20,
+            color:   isMax ? '#ff6644' : '#ff9f1c',
+            isMax
+        });
+
+        // 音效 + 震屏（满格更强）
+        const shakeIntensity = 8 + (this.railgunState.chargeLevel - 1) * 4;
+        this.audio.playTone(60,  0.5,  0.06 + this.railgunState.chargeLevel * 0.01, 'square');
+        this.audio.playTone(200, 0.25, 0.04, 'sawtooth');
+        this.screenShake = shakeIntensity;
     }
 
     pointToLineDistance(px, py, x1, y1, x2, y2) {
@@ -2697,46 +2890,59 @@ class Game {
         return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
     }
 
-    drawRailgunCharge(ctx) {
+    drawRailgunPower(ctx) {
         if (this.getActiveWeapon() !== 'RAILGUN') return;
-        const state = this.turret.railgunState;
-        if (!state || state.phase !== 'CHARGING') return;
+        const r = this.railgunState;
+        const x = this.turret.x;
+        const y = this.turret.y - 30;
 
-        const progress = 1 - (state.chargeTimer / 90);
-
-        // 能量环
-        for (let i = 0; i < 4; i++) {
-            const radius = 50 - i * 8 + Math.sin(Date.now() / 100 + i) * 3;
-            const alpha  = progress * (1 - i / 4) * 0.55;
-            ctx.strokeStyle = `rgba(255,159,28,${alpha})`;
-            ctx.lineWidth   = 2.5;
+        // CD 进度弧（背景）
+        if (r.cooldown > 0) {
+            const maxCD   = r.baseCooldown * (1 + 0.35 * (r.chargeLevel - 1));
+            const progress = 1 - r.cooldown / maxCD;
+            ctx.save();
+            ctx.strokeStyle = 'rgba(255,159,28,0.25)';
+            ctx.lineWidth   = 3;
             ctx.beginPath();
-            ctx.arc(this.turret.x, this.turret.y, radius, 0, Math.PI * 2);
+            ctx.arc(x, this.turret.y, 28, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress);
             ctx.stroke();
+            ctx.restore();
         }
 
-        // 炮管蓄能光效
+        // 功率格
+        for (let i = 0; i < r.maxCharge; i++) {
+            const offset = (i - 2) * 12;
+            const filled = i < r.chargeLevel;
+            // 满格时格子变红橙
+            const color  = filled
+                ? (r.chargeLevel === r.maxCharge ? '#ff4422' : '#ff9f1c')
+                : null;
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(x + offset - 4, y - 4, 8, 8);
+            if (filled) {
+                ctx.shadowBlur  = 6;
+                ctx.shadowColor = color;
+                ctx.fillStyle   = color;
+                ctx.fill();
+            } else {
+                ctx.shadowBlur  = 0;
+                ctx.strokeStyle = '#444';
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        // 功率数值标签
         ctx.save();
-        ctx.translate(this.turret.x, this.turret.y);
-        ctx.rotate(this.turret.angle);
-        ctx.shadowBlur  = 28 * progress;
+        ctx.fillStyle   = r.chargeLevel === r.maxCharge ? '#ff4422' : '#ff9f1c';
+        ctx.font        = 'bold 9px monospace';
+        ctx.textAlign   = 'center';
+        ctx.shadowBlur  = 4;
         ctx.shadowColor = '#ff9f1c';
-        ctx.fillStyle   = `rgba(255,159,28,${progress * 0.75})`;
-        ctx.fillRect(0, -5, 42, 10);
-
-        // 蓄能进度条
-        ctx.shadowBlur  = 0;
-        ctx.fillStyle   = 'rgba(0,0,0,0.65)';
-        ctx.fillRect(0, 14, 40, 4);
-        ctx.fillStyle   = '#ff9f1c';
-        ctx.fillRect(0, 14, 40 * progress, 4);
+        ctx.fillText(`PWR ${r.chargeLevel}/${r.maxCharge}`, x, y - 12);
         ctx.restore();
-
-        // 蓄能音效（渐强）
-        if (Math.random() < 0.08) {
-            const pitch = 200 + progress * 400;
-            this.audio.playTone(pitch, 0.05, 0.015 * progress, 'sine');
-        }
     }
     fireWeapon_PLASMA() {
         const first = this.turret.target;
@@ -3015,8 +3221,10 @@ class Game {
             this.autoShoot();
         }
 
-        this.updateRailgunCharge(dt);
+        this.updateRailgunCooldown();
         this.updateSniperBullets(dt);
+        this.updateSniperReload();
+        this.updateSniperRecoil();
 
         // 敌人生成（Wave Packet System）
         if (this.currentPacket < this.wavePackets.length) {
@@ -4329,8 +4537,9 @@ class Game {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         // 游戏对象先画
-        this.drawRailgunCharge(ctx);
+        this.drawRailgunPower(ctx);
         this.drawGameObjects();
+        this.drawSniperAmmo(ctx);
         this.drawSniperBullets(ctx);
         this.drawSniperTargets(ctx);
         this.drawRelicEffects(ctx);
