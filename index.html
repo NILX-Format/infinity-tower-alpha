@@ -15,13 +15,16 @@
             margin: 0; padding: 0;
             width: 100%; height: 100%;
             background: #1a1a2e;
-            display: flex; flex-direction: column;
-            align-items: center; justify-content: center;
+            display: flex; 
+            flex-direction: column;
+            align-items: center; 
+            justify-content: center;
             font-family: 'Courier New', monospace; color: #eee;
             overflow: hidden;
             touch-action: manipulation;
             -webkit-text-size-adjust: 100%;
             -webkit-tap-highlight-color: transparent;
+            
         }
 
         #gameContainer {
@@ -60,49 +63,86 @@
         #wave { color: #4ecdc4; }
         #weaponStatus { color: #ffd93d; }
         #enemyStatus { color: #a8f0ff; }
-
-        #speedControls {
-            position: absolute; bottom: 10px; left: 10px;
-            display: flex; gap: 4px; flex-wrap: nowrap;
+        
+        #xpBarFill {
+            height: 100%; width: 0%;
+            background: #4ecdc4;
+            box-shadow: 0 0 10px #4ecdc4;
+            transition: width 0.4s ease;
+            border-radius: 0 2px 2px 0;
         }
 
-        #speedControls button {
-            padding: 6px 10px;
-            font-size: calc(11px * var(--ui-scale));
+        /* Full-screen Status Overlay */
+        #statusOverlay {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(5,8,15,0.95);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            display: none;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: center;
+            z-index: 2000;
+            color: #fff;
+            overflow-y: auto;
+            padding-bottom: 80px;
+        }
+        #statusOverlay.open {
+            display: flex;
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .overlay-close {
+            position: sticky;
+            top: 0;
+            width: 100%;
+            display: flex;
+            justify-content: flex-end;
+            padding: 14px 18px 0;
+            z-index: 10;
+        }
+        .overlay-close-btn {
+            font-size: 22px;
+            color: #9FB8FF;
             cursor: pointer;
-            background: #333; color: white;
-            border: 1px solid #555; border-radius: 3px;
-            pointer-events: auto;
-            min-height: 44px; min-width: 44px;
+            line-height: 1;
+            padding: 6px 10px;
             touch-action: manipulation;
         }
-        #speedControls button:hover  { background: #444; }
-        #speedControls button.active { background: #2a5a4a; border-color: #4ecdc4; color: #4ecdc4; font-weight: bold; }
-        #muteBtn { min-width: 44px; font-size: calc(14px * var(--ui-scale)); }
-        #muteBtn.muted { color: #ff6b6b; border-color: #ff6b6b; }
-
-        #statusDock {
-            position: absolute; bottom: 10px; right: 10px;
-            display: flex; flex-direction: column; align-items: flex-end;
-            gap: 6px; pointer-events: auto;
+        #overlayTitle {
+            color: #4ecdc4;
+            letter-spacing: 4px;
+            font-size: calc(15px * var(--ui-scale));
+            margin: 0 0 10px;
         }
-
-        #statusToggle {
-            background: rgba(0,0,0,0.6); padding: 8px 12px; border-radius: 5px;
-            border: 1px solid #444; color: #ffd93d;
-            font-size: calc(12px * var(--ui-scale));
-            margin: 0; cursor: pointer;
-            min-height: 44px; touch-action: manipulation;
+        #fullStatDisplay {
+            width: min(300px, 86vw);
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 12px 16px;
+            margin: 8px 0;
         }
-
-        #statusPanel {
-            width: min(230px, 55vw);
-            background: rgba(0,0,0,0.92); border: 1px solid #444;
-            border-radius: 8px; padding: 10px 12px; display: none;
-            font-size: calc(12px * var(--ui-scale));
-            max-height: 60vh; overflow-y: auto;
+        #fullStatDisplay .stat-row {
+            font-size: calc(13px * var(--ui-scale));
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
         }
-        #statusPanel.open { display: block; }
+        #fullStatDisplay .stat-row:last-child { border-bottom: none; }
+
+        #overlayResources {
+            width: min(300px, 86vw);
+            color: #ffd93d;
+            font-size: calc(11px * var(--ui-scale));
+            margin-top: 10px;
+            padding: 8px 12px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            border: 1px solid rgba(255,211,61,0.15);
+        }
 
         #gameOver, #victory {
             position: absolute; top: 50%; left: 50%;
@@ -183,30 +223,6 @@
         }
         #resetProgressBtn:hover { background: rgba(150,0,0,0.8); }
 
-        #relicPanel {
-            position: absolute; right: 10px; top: 70px;
-            width: min(160px, 38vw);
-            background: rgba(0,0,0,0.65); color: white;
-            padding: 8px; font-family: monospace;
-            font-size: calc(10px * var(--ui-scale));
-            border: 1px solid rgba(255,255,255,0.2);
-            border-radius: 6px; pointer-events: none;
-        }
-        #keystonePanel {
-            position: absolute; right: 10px; top: 220px;
-            width: min(160px, 38vw);
-            background: rgba(0,0,0,0.75); color: #c77dff;
-            padding: 8px; font-family: monospace;
-            font-size: calc(10px * var(--ui-scale));
-            border: 1px solid #c77dff; border-radius: 6px; pointer-events: none;
-        }
-        #relicReward, #keystoneReward {
-            margin-top: 10px; font-family: monospace;
-            font-size: calc(13px * var(--ui-scale));
-            line-height: 1.5; text-shadow: 0 0 5px #000;
-        }
-        #keystoneReward { color: #c77dff; }
-
         /* Main menu */
         #mainMenu {
             position: absolute; top: 50%; left: 50%;
@@ -229,54 +245,326 @@
             font-size: calc(10px * var(--ui-scale));
             color: #888; font-family: monospace; z-index: 100; pointer-events: none;
         }
+
+        @keyframes xpPulse {
+        0%,100% { box-shadow: 0 0 12px currentColor; }
+        50%     { box-shadow: 0 0 24px currentColor; }
+        }
+
+        #combatHUD {
+            position: absolute;
+            top: 20px;
+            right: 18px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 5px;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        #waveLabel {
+            font-size: calc(18px * var(--ui-scale));
+            color: #4ecdc4;
+            letter-spacing: 1.5px;
+            font-family: 'Courier New', monospace;
+        }
+
+        #xpBarContainer {
+            width: 34vw;
+            max-width: 110px;
+            min-width: 70px;
+            height: 4px;
+            background: rgba(255,255,255,0.06);
+            border-radius: 3px;
+            overflow: hidden;
+            border: none;
+            margin: 1px 0;
+        }
+
+        #enemyCounter {
+            font-size: calc(18px * var(--ui-scale));
+            color: #888;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 0.5px;
+        }
+
+        /* AUTO — 小圆点开关 */
+        #autoToggle {
+            pointer-events: auto;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+            margin-top: 2px;
+            padding: 3px 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+        #autoToggle::before {
+            content: '';
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #555;
+            border: 1px solid #666;
+            transition: background 0.2s, box-shadow 0.2s;
+            flex-shrink: 0;
+        }
+        #autoToggle.active::before {
+            background: #4ecdc4;
+            box-shadow: 0 0 5px rgba(78,205,196,0.7);
+            border-color: #4ecdc4;
+        }
+        #autoToggle .auto-label {
+            font-size: calc(18px * var(--ui-scale));
+            color: #555;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 1px;
+            transition: color 0.2s;
+        }
+        #autoToggle.active .auto-label {
+            color: #4ecdc4;
+        }
+
+        /* ═══════════════════════════════
+           SYSTEM CONTROLS  (left-top)
+        ═══════════════════════════════ */
+        #systemControls {
+            position: absolute;
+            top: 18px;
+            left: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            z-index: 20;
+        }
+
+        /* ── shared circle base ── */
+        .hud-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+            position: relative;
+        }
+        .hud-btn:active { transform: scale(0.90); }
+
+        /* ── SPEED button ── */
+        .speed-btn {
+            font-size: 13px;
+            color: #ffd93d;
+            background: rgba(0,0,0,0.60);
+            border: 2px solid rgba(255,217,61,0.30);
+        }
+        /* spinning ring – hidden by default */
+        .speed-btn::before {
+            content: '';
+            position: absolute;
+            inset: -5px;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            border-top-color: #ffd93d;
+            opacity: 0;
+            animation: hudSpin 1.4s linear infinite;
+            transition: opacity 0.25s;
+        }
+        @keyframes hudSpin { to { transform: rotate(360deg); } }
+
+        /* active / turbo — 状态圆，和 gear 同级，无强发光 */
+        .speed-btn.active,
+        .speed-btn.turbo {
+            background: rgba(255,217,61,0.08);
+            color: #ffd93d;
+            border-color: rgba(255,217,61,0.45);
+        }
+        .speed-btn.active::before,
+        .speed-btn.turbo::before { opacity: 0.55; }
+
+        /* ── SYSTEM (gear) button ── */
+        .system-gear-btn {
+            font-size: 18px;
+            color: #9FB8FF;
+            background: rgba(0,0,0,0.60);
+            border: 2px solid rgba(159,184,255,0.22);
+        }
+        .system-gear-btn:hover,
+        .system-gear-btn.open {
+            background: rgba(159,184,255,0.10);
+            box-shadow: 0 0 14px rgba(159,184,255,0.32);
+            color: #c8daff;
+        }
+        .system-gear-btn.open { transform: rotate(60deg); }
+        .system-gear-btn.open:active { transform: rotate(80deg) scale(0.90); }
+
+        /* ── SYSTEM dropdown panel ── */
+        #systemWrapper { position: relative; }
+
+        #systemPanel {
+            position: absolute;
+            top: 50px;
+            left: 0;
+            background: rgba(8,12,22,0.97);
+            border: 1px solid rgba(159,184,255,0.18);
+            border-radius: 10px;
+            padding: 4px 0;
+            display: none;
+            flex-direction: column;
+            min-width: 130px;
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.75), 0 0 0 1px rgba(159,184,255,0.06);
+            z-index: 9999;
+            transform-origin: top left;
+        }
+        #systemPanel.open {
+            display: flex;
+            animation: panelIn 0.2s cubic-bezier(0.34,1.56,0.64,1);
+        }
+        @keyframes panelIn {
+            from { opacity: 0; transform: scale(0.82) translateY(-6px); }
+            to   { opacity: 1; transform: scale(1)    translateY(0); }
+        }
+
+        .system-item {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            padding: 9px 14px;
+            font-size: 12px;
+            cursor: pointer;
+            color: #9FB8FF;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 0.4px;
+            transition: background 0.15s, color 0.15s;
+            white-space: nowrap;
+        }
+        .system-item:first-child { border-radius: 10px 10px 0 0; }
+        .system-item:last-child  { border-radius: 0 0 10px 10px; }
+        .system-item:hover  { background: rgba(78,205,196,0.12); color: #fff; }
+        .system-item:active { background: rgba(78,205,196,0.22); }
+
+        .system-item .si-icon  { font-size: 14px; width: 18px; text-align: center; flex-shrink: 0; }
+        .system-item .si-label { flex: 1; }
+        .system-item .si-state { font-size: 10px; color: #555; letter-spacing: 0; }
+        .system-item .si-state.on { color: #4ecdc4; }
+
+        .system-divider {
+            height: 1px;
+            margin: 3px 10px;
+            background: rgba(255,255,255,0.06);
+        }
+
+        /* ── BUILD button ── */
+        .build-btn {
+            font-size: 18px;
+            color: #6bcb77;
+            background: rgba(0,0,0,0.60);
+            border: 2px solid rgba(107,203,119,0.22);
+        }
+        .build-btn:hover {
+            background: rgba(107,203,119,0.10);
+            box-shadow: 0 0 14px rgba(107,203,119,0.32);
+            color: #8de899;
+        }
+
+        
     </style>
 </head>
 <body>
     <div id="gameContainer">
         <canvas id="gameCanvas" width="760" height="1080"></canvas>
         
-        <div id="ui">
-            <div class="stat" id="weaponStatus">🎯 🔫 基础子弹</div>
-            <div class="stat" id="wave">🌊 Wave 1</div>
-            <div class="stat" id="enemyStatus">👾 敌人 5 / 剩余 5</div>
-        </div>
         <div class="stat" id="hp">❤️ HP: 10/10</div>
 
-        <div id="speedControls">
-            <button id="speedBtn1" onclick="game.setSpeed(1.0)">x1.0</button>
-            <button id="speedBtn2" onclick="game.setSpeed(2.0)">x2.0</button>
-            <button id="speedBtn3" onclick="game.setSpeed(3.0)">x3.0</button>
-            <button id="muteBtn" title="Toggle Sound">🔊</button>
-        </div>
-        <button id="resetProgressBtn">⚠ RESET</button>
-        
-        <div id="statusDock">
-            <button id="statusToggle">Status ▼</button>
-            <div id="statusPanel">
-                <div class="stat-display" style="margin: 0;">
-                    <div class="stat-row"><span>当前武器:</span> <span id="currentWeapon" style="color: #4ecdc4;">基础子弹</span></div>
-                    <div class="stat-row"><span>ATK:</span> <span id="statAtk">1</span></div>
-                    <div class="stat-row"><span>SPEED:</span> <span id="statSpeed">1.0</span></div>
-                    <div class="stat-row"><span>HP:</span> <span id="statHp">10/10</span></div>
-                    <div class="stat-row"><span>ARMOR:</span> <span id="statArmor">0%</span></div>
-                    <div class="stat-row"><span>RANGE:</span> <span id="statRange">120</span></div>
-                    <div class="stat-row"><span>VIEW:</span> <span id="statView">150</span></div>
-                    <div class="stat-row"><span>SPECIAL:</span> <span id="statSpecial">0%</span></div>
+        <div id="systemControls">
+
+            <!-- Speed toggle -->
+            <div id="speedToggle" class="hud-btn speed-btn">x1</div>
+
+            <!-- System gear + dropdown -->
+            <div id="systemWrapper">
+                <div id="systemToggle" class="hud-btn system-gear-btn">⚙</div>
+
+                <div id="systemPanel">
+                    <div id="soundToggle" class="system-item">
+                        <span class="si-icon">🔊</span>
+                        <span class="si-label">SOUND</span>
+                        <span class="si-state on" id="soundState">ON</span>
+                    </div>
+                    <div class="system-divider"></div>
+                    <div id="menuToggle" class="system-item">
+                        <span class="si-icon">☰</span>
+                        <span class="si-label">MENU</span>
+                    </div>
                 </div>
-                <div id="statusResources" style="margin-top: 8px; color: #ffd93d; font-size: 12px;">🔥 ATK:0 | ⚡ SPD:0 | 🛡️ ARM:0 | 🧨 FLR:0</div>
             </div>
-        </div>
-        
-        <!-- 遗物面板 (普通遗物) -->
-        <div id="relicPanel">
-            <b style="color:#c9d1d9;">✦ RELICS</b>
-            <div id="relicList" style="margin-top:6px;line-height:1.8;"></div>
+
+            <!-- Build — opens status overlay -->
+            <div id="buildToggle" class="hud-btn build-btn" onclick="game && game.toggleStatusOverlay(true)">⚒</div>
+
         </div>
 
-        <!-- 基石遗物面板 (第7步) -->
-        <div id="keystonePanel">
-            <b style="color:#c77dff;">✦ KEYSTONES</b>
-            <div id="keystoneList" style="margin-top:6px;line-height:1.8; color:#c77dff;"></div>
+        <div id="combatHUD">
+            <div id="waveLabel">WAVE 1</div>
+            <div id="xpBarContainer">
+                <div id="xpBarFill"></div>
+            </div>
+            <div id="enemyCounter">0 / 0</div>
+            <div id="autoToggle" class="active"><span class="auto-label">AUTO</span></div>
+        </div>
+
+        <!-- ── Full-screen Status Overlay ── -->
+        <div id="statusOverlay">
+            <div class="overlay-close">
+                <span class="overlay-close-btn" onclick="game.toggleStatusOverlay(false)">✕</span>
+            </div>
+            <h2 id="overlayTitle">SYSTEM STATUS</h2>
+
+            <!-- Hidden span targets so updateUI() doesn't crash -->
+            <span id="currentWeapon"   style="display:none"></span>
+            <span id="statAtk"         style="display:none"></span>
+            <span id="statSpeed"       style="display:none"></span>
+            <span id="statHp"          style="display:none"></span>
+            <span id="statArmor"       style="display:none"></span>
+            <span id="statRange"       style="display:none"></span>
+            <span id="statView"        style="display:none"></span>
+            <span id="statSpecial"     style="display:none"></span>
+            <span id="statusResources" style="display:none"></span>
+            <span id="weaponStatus2"   style="display:none"></span>
+
+            <!-- Stat table -->
+            <div id="fullStatDisplay"></div>
+
+            <!-- 7-node radar -->
+            <canvas id="radarCanvas" width="200" height="200" style="margin:12px 0;display:block;"></canvas>
+
+            <!-- Resources -->
+            <div id="overlayResources"></div>
+
+            <!-- Relic list -->
+            <div style="width:min(300px,86vw);margin-top:12px;">
+                <div style="color:#ffd93d;font-size:calc(11px * var(--ui-scale));letter-spacing:1px;margin-bottom:6px;">RELICS</div>
+                <div id="relicList" style="font-size:calc(11px * var(--ui-scale));line-height:1.7;font-family:monospace;">
+                    <span style="color:#555">尚无遗物</span>
+                </div>
+            </div>
+
+            <!-- Keystone list -->
+            <div style="width:min(300px,86vw);margin-top:12px;padding-bottom:20px;">
+                <div style="color:#c77dff;font-size:calc(11px * var(--ui-scale));letter-spacing:1px;margin-bottom:6px;">KEYSTONES</div>
+                <div id="keystoneList" style="font-size:calc(10px * var(--ui-scale));line-height:1.8;font-family:monospace;">
+                    <span style="color:#555">无</span>
+                </div>
+            </div>
         </div>
 
         <div id="gameOver">
@@ -304,12 +592,13 @@
             </div>
         </div>
     </div>
+
     
-    <div id="instructions">
+    
         <span class="auto-mode">🤖 Infinity Tower · 基石传承</span> | 自动战斗 | 波次升级 | 遗物永久成长
     </div>
 
-    <div id="versionLabel" style="position:absolute;top:6px;right:12px;font-size:12px;color:#888;font-family:monospace;z-index:100;pointer-events:none;">v1.3.7 alpha
+    <div id="versionLabel" style="position:absolute;top:6px;right:12px;font-size:12px;color:#888;font-family:monospace;z-index:100;pointer-events:none;">v1.3.8 alpha
     </div>
 
     <div id="mainMenu">
@@ -331,7 +620,7 @@
     <br><br>
 
     <div style="font-size:12px;color:#777">
-    v1.3.7 a
+    v1.3.8 a
     </div>
 
     </div>
@@ -399,6 +688,130 @@ class AudioManager
     }
 }
 
+class FogOfWarSystem {
+    constructor(canvas) {
+        this.canvas = canvas;
+
+        // 噪声纹理（只生成一次）
+        this.noiseCanvas = document.createElement('canvas');
+        this.noiseCanvas.width = 256;
+        this.noiseCanvas.height = 256;
+        const noiseCtx = this.noiseCanvas.getContext('2d');
+        this.generateNoiseTexture(noiseCtx);
+        this.pattern = noiseCtx.createPattern(this.noiseCanvas, 'repeat');
+
+        // 离屏合成 canvas（和主 canvas 同尺寸）
+        this.offscreen = document.createElement('canvas');
+        this.offscreen.width  = canvas.width;
+        this.offscreen.height = canvas.height;
+        this.offCtx = this.offscreen.getContext('2d');
+
+        // 流动参数
+        this.offsetX = 0;
+        this.offsetY = 0;
+        this.speedX  = 0.02;
+        this.speedY  = 0.015;
+    }
+
+    generateNoiseTexture(ctx) {
+        const imageData = ctx.createImageData(256, 256);
+        const data = imageData.data;
+        for (let i = 0; i < data.length; i += 4) {
+            const n = Math.random();
+            data[i]     = 20 + n * 20;
+            data[i + 1] = 30 + n * 25;
+            data[i + 2] = 50 + n * 35;
+            data[i + 3] = 165;
+        }
+        ctx.putImageData(imageData, 0, 0);
+    }
+
+    update(dt) {
+        this.offsetX += this.speedX * dt;
+        this.offsetY += this.speedY * dt;
+    }
+
+    draw(ctx, turretX, turretY, viewRadius, flares = []) {
+        const oc  = this.offCtx;
+        const w   = this.canvas.width;
+        const h   = this.canvas.height;
+
+        // 1. 深色底层
+        oc.save();
+        oc.clearRect(0, 0, w, h);
+        oc.globalCompositeOperation = 'source-over';
+        oc.fillStyle = 'rgba(8,12,25,0.4)';
+        oc.fillRect(0, 0, w, h);
+
+        // 2. 离屏画整层流动迷雾
+        oc.fillStyle = this.pattern;
+        oc.save();
+        oc.translate(-(this.offsetX % 256), -(this.offsetY % 256));
+        oc.fillRect(0, 0, w + 256, h + 256);
+        oc.restore();
+
+        // 3. 在离屏上挖出主视野
+        oc.globalCompositeOperation = 'destination-out';
+        const grad = oc.createRadialGradient(
+            turretX, turretY, viewRadius * 0.6,
+            turretX, turretY, viewRadius
+        );
+        grad.addColorStop(0,    'rgba(0,0,0,1)');
+        grad.addColorStop(0.7,  'rgba(0,0,0,1)');
+        grad.addColorStop(0.92, 'rgba(0,0,0,0.2)');
+        grad.addColorStop(1,    'rgba(0,0,0,0)');
+        oc.fillStyle = grad;
+        oc.beginPath();
+        oc.arc(turretX, turretY, viewRadius, 0, Math.PI * 2);
+        oc.fill();
+
+        // 4. 挖出 flare 视野
+        flares.forEach(flare => {
+            const fg = oc.createRadialGradient(
+                flare.x, flare.y, 0,
+                flare.x, flare.y, flare.radius
+            );
+            fg.addColorStop(0,   'rgba(0,0,0,1)');
+            fg.addColorStop(0.7, 'rgba(0,0,0,0.8)');
+            fg.addColorStop(1,   'rgba(0,0,0,0)');
+            oc.fillStyle = fg;
+            oc.beginPath();
+            oc.arc(flare.x, flare.y, flare.radius, 0, Math.PI * 2);
+            oc.fill();
+        });
+
+        oc.restore();
+
+        // 5. 把离屏迷雾合成到主 canvas
+        ctx.drawImage(this.offscreen, 0, 0);
+
+        // 6. 视野边缘极淡光晕
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = 'rgba(80,140,255,0.05)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(turretX, turretY, viewRadius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+
+        // 7. flare 暖光晕（在迷雾之上）
+        flares.forEach(flare => {
+            const wg = ctx.createRadialGradient(
+                flare.x, flare.y, 0,
+                flare.x, flare.y, flare.radius
+            );
+            wg.addColorStop(0,   'rgba(255,245,180,0.18)');
+            wg.addColorStop(0.5, 'rgba(255,230,120,0.08)');
+            wg.addColorStop(1,   'rgba(255,220,100,0)');
+            ctx.fillStyle = wg;
+            ctx.beginPath();
+            ctx.arc(flare.x, flare.y, flare.radius, 0, Math.PI * 2);
+            ctx.fill();
+        });
+    }
+}
+
 class Game {
     constructor() {
         // ===== Base resolution (internal canvas coords never change) =====
@@ -427,25 +840,99 @@ class Game {
             upgradePanel: document.getElementById('upgradePanel'),
             upgradeButtons: document.getElementById('upgradeButtons'),
             upgradeTitle: document.getElementById('upgradeTitle'),
-            statusToggle: document.getElementById('statusToggle'),
-            statusPanel: document.getElementById('statusPanel'),
             statusResources: document.getElementById('statusResources'),
-            currentWeapon: document.getElementById('currentWeapon'),
-            statAtk: document.getElementById('statAtk'),
-            statSpeed: document.getElementById('statSpeed'),
-            statHp: document.getElementById('statHp'),
-            statArmor: document.getElementById('statArmor'),
-            statRange: document.getElementById('statRange'),
-            statView: document.getElementById('statView'),
-            statSpecial: document.getElementById('statSpecial'),
-            weaponHint: document.getElementById('weaponHint'),
-            relicList: document.getElementById('relicList'),
-            keystoneList: document.getElementById('keystoneList'), // 第7步
-            relicReward: document.getElementById('relicReward'),
-            keystoneReward: document.getElementById('keystoneReward') // 第4步
+            currentWeapon:   document.getElementById('currentWeapon'),
+            statAtk:         document.getElementById('statAtk'),
+            statSpeed:       document.getElementById('statSpeed'),
+            statHp:          document.getElementById('statHp'),
+            statArmor:       document.getElementById('statArmor'),
+            statRange:       document.getElementById('statRange'),
+            statView:        document.getElementById('statView'),
+            statSpecial:     document.getElementById('statSpecial'),
+            weaponHint:      document.getElementById('weaponHint'),
+            relicList:       document.getElementById('relicList'),
+            keystoneList:    document.getElementById('keystoneList'),
+            relicReward:     document.getElementById('relicReward'),
+            keystoneReward:  document.getElementById('keystoneReward'),
+            speedToggle:     document.getElementById('speedToggle'),
+            xpBarFill:       document.getElementById('xpBarFill'),
+            waveLabel:       document.getElementById('waveLabel'),
+            enemyCounter:    document.getElementById('enemyCounter'),
+            fullStatDisplay: document.getElementById('fullStatDisplay'),
+            overlayResources:document.getElementById('overlayResources'),
         };
+
+        this.autoEnabled = true;
+
+        const autoBtn = document.getElementById("autoToggle");
+        autoBtn.classList.add("active");
+
+        autoBtn.addEventListener("click", () => {
+            this.autoEnabled = !this.autoEnabled;
+            autoBtn.classList.toggle("active", this.autoEnabled);
+        });
+        
+        this.systemOpen = false;
+        
+        const systemToggle = document.getElementById("systemToggle");
+        const systemPanel  = document.getElementById("systemPanel");
+
+        const closeSystemPanel = () => {
+            systemPanel.classList.remove("open");
+            systemToggle.classList.remove("open");
+            this.systemOpen = false;
+        };
+
+        systemToggle.addEventListener("click", (e) => {
+            e.stopPropagation();
+            if (this.systemOpen) { closeSystemPanel(); return; }
+            this.systemOpen = true;
+            systemToggle.classList.add("open");
+            systemPanel.classList.add("open");
+        });
+
+        document.getElementById("soundToggle")
+            .addEventListener("click", () => {
+                this.toggleMute();
+                const enabled = this.audio ? this.audio.enabled : true;
+                const stateEl = document.getElementById("soundState");
+                const iconEl  = document.querySelector("#soundToggle .si-icon");
+                if (stateEl) { stateEl.textContent = enabled ? "ON" : "OFF"; stateEl.classList.toggle("on", enabled); }
+                if (iconEl)  { iconEl.textContent = enabled ? "🔊" : "🔇"; }
+                closeSystemPanel();
+            });
+
+        document.getElementById("menuToggle")
+            .addEventListener("click", () => {
+                this.toggleMenu();
+                closeSystemPanel();
+            });
+
+        document.addEventListener("click", (e) => {
+            if (this.systemOpen && !document.getElementById("systemWrapper").contains(e.target)) {
+                closeSystemPanel();
+            }
+        });
+
+        
         this.uiState = {};
         this.statusExpanded = false;
+        this.dockLastActive = Date.now();
+
+        this.speedMultiplier = 1;
+
+        this.ui.speedToggle.addEventListener("click", () => {
+            if (this.speedMultiplier === 1) {
+                this.speedMultiplier = 3;
+                this.ui.speedToggle.textContent = "x3";
+                this.ui.speedToggle.classList.add("active", "turbo");
+            } else {
+                this.speedMultiplier = 1;
+                this.ui.speedToggle.textContent = "x1";
+                this.ui.speedToggle.classList.remove("active", "turbo");
+            }
+            this.timeScale = this.speedMultiplier;
+        });
 
         // ===== Audio System =====
         this.audio = new AudioManager();
@@ -511,6 +998,9 @@ class Game {
         this.lastFrameTime = performance.now();
         this.uiElapsedMs = 0;
         this.collectedResources = { atk: 0, speed: 0, armor: 0, hp: 0, special: 0 };
+
+        // 迷雾系统
+        this.fogSystem = new FogOfWarSystem(canvas);
         this.flareCharges = 0;
         this.flareMax = 3;
         this.activeFlares = [];
@@ -808,8 +1298,7 @@ class Game {
                 }
             }
         });
-        this.ui.statusToggle.addEventListener('click', () => this.toggleStatusPanel());
-        document.getElementById('resetProgressBtn').addEventListener('click', () => this.resetAllProgress());
+        document.getElementById('resetProgressBtn')?.addEventListener('click', () => this.resetAllProgress());
         window.addEventListener('resize', () => this.updateContainerScale());
         window.addEventListener("keydown", e => {
             // Debug: manual assimilation trigger
@@ -956,7 +1445,7 @@ class Game {
                     `${id.replace(/_/g, ' ')}</span><br>`;
         }
         if (html === '') html = "<span style='color:#555'>无</span>";
-        this.ui.keystoneList.innerHTML = html;
+        if (this.ui.keystoneList) this.ui.keystoneList.innerHTML = html;
     }
 
     // 统一敌人死亡 Hook，所有 keystone/relic 触发都集中在这里
@@ -1484,32 +1973,138 @@ class Game {
         return { remove: false, reason: null };
     }
 
+    // ── Speed control ──────────────────────────────────────────
     setSpeed(speed) {
         this.resumeAudio();
         this.timeScale = speed;
-        // 更新速度按钮高亮
-        [1, 2, 3].forEach(n => {
-            const btn = document.getElementById(`speedBtn${n}`);
-            if (btn) btn.classList.toggle('active', speed === n * 1.0);
-        });
-        console.log("游戏速度:", speed + "x");
+        const label = document.getElementById('speedLabel');
+        if (label) label.textContent = `x${speed.toFixed(1)}`;
+        const speedToggle = document.getElementById('speedToggle');
+        if (speedToggle) {
+            speedToggle.classList.toggle('active', speed > 1.0);
+            speedToggle.classList.toggle('turbo',  speed > 1.0);
+        }
     }
 
-    toggleStatusPanel() {
-        this.statusExpanded = !this.statusExpanded;
-        this.radarExpanded = this.statusExpanded;
-        this.ui.statusPanel.classList.toggle('open', this.statusExpanded);
-        this.ui.statusToggle.textContent = this.statusExpanded ? 'Status ▲' : 'Status ▼';
+    cycleSpeed() {
+        const speeds = [1.0, 3.0];
+        const next   = speeds[(speeds.indexOf(this.timeScale) + 1) % speeds.length];
+        this.setSpeed(next);
+    }
 
-        // 展开雷达时暂停游戏（仅在正常游戏中，不影响波次结算暂停）
-        if (this.radarExpanded) {
-            this.radarPaused = true;
+    // ── XP / wave progress bar ─────────────────────────────────
+   updateXpBar() {
+    const fill = this.ui.xpBarFill;
+    if (!fill) return;
+
+    const total  = Math.max(1, this.enemiesToSpawn);
+    const alive  = this.enemies.filter(e => this.isHostile(e)).length;
+    const killed = total - alive;
+    const pct    = Math.min((killed / total) * 100, 100);
+
+    fill.style.width = pct + '%';
+
+    if (pct < 70) {
+        fill.style.background = '#4ecdc4';
+        fill.style.boxShadow  = '0 0 8px #4ecdc4';
+        fill.style.animation  = '';
+    } 
+    else if (pct < 90) {
+        fill.style.background = '#ffd93d';
+        fill.style.boxShadow  = '0 0 12px #ffd93d';
+        fill.style.animation  = '';
+    } 
+    else {
+        fill.style.background = '#ff6b6b';
+        fill.style.boxShadow  = '0 0 18px #ff6b6b';
+        fill.style.animation  = 'xpPulse 0.8s infinite';
+    }
+
+    if (pct >= 100) {
+        fill.style.animation = '';
+        fill.style.boxShadow = '0 0 30px white';
+        setTimeout(() => {
+            fill.style.boxShadow = '';
+        }, 100);
+    }
+}
+
+    updateFullStats() {
+        const el = this.ui.fullStatDisplay;
+        const rs = this.ui.overlayResources;
+        if (!el) return;
+
+        const s   = this.turret.stats;
+        const eff = this.getEffectiveCombatStats();
+        const ar  = Math.min(s.armor * 0.05, 0.75);
+        const cr  = this.computeCritStats(s.special || 0);
+        const vv  = this.getEffectiveView();
+        const vTx = this.isStatCapped('VIEW') ? `${vv} <span style="color:#ff6b6b">MAX</span>` : `${vv}/${this.viewCap}`;
+        const sh  = this.turret.shield;
+        const shTx= sh.max > 0
+            ? `<span style="color:#4d96ff">${Math.max(0,Math.ceil(sh.current))}/${sh.max}</span>`
+            : `<span style="color:#444">—</span>`;
+
+        el.innerHTML = `
+            <div class="stat-row"><span>WEAPON</span>  <span style="color:#ffd93d">${this.getWeaponName(this.getActiveWeapon())}</span></div>
+            <div class="stat-row"><span>WAVE</span>    <span style="color:#4ecdc4">${this.wave}</span></div>
+            <div class="stat-row"><span>ATK</span>     <span>${s.atk.toFixed(1)}</span></div>
+            <div class="stat-row"><span>SPEED</span>   <span>${s.speed.toFixed(2)}</span></div>
+            <div class="stat-row"><span>HP</span>      <span style="color:#6bcb77">${Math.ceil(s.hp)} / ${s.maxHp}</span></div>
+            <div class="stat-row"><span>SHIELD</span>  ${shTx}</div>
+            <div class="stat-row"><span>ARMOR</span>   <span>${(ar*100).toFixed(0)}%</span></div>
+            <div class="stat-row"><span>RANGE</span>   <span>${Math.round(eff.range)}</span></div>
+            <div class="stat-row"><span>VIEW</span>    <span>${vTx}</span></div>
+            <div class="stat-row"><span>CRIT</span>    <span style="color:#c77dff">${(cr.critChance*100).toFixed(0)}%</span></div>
+            <div class="stat-row"><span>FLARES</span>  <span>🔦 ${this.flareCharges}/${this.flareMax}</span></div>
+        `;
+    }
+
+    // legacy alias so old code still works
+    toggleStatusPanel() { this.toggleStatusOverlay(!this.radarExpanded); }
+
+    toggleStatusOverlay(open) {
+        this.radarExpanded = open;
+        const el = document.getElementById('statusOverlay');
+        if (!el) return;
+        if (open) {
+            el.classList.add('open');
             this.isPaused = true;
+            this.updateFullStats();
+            this.drawStatusRadar();
         } else {
-            this.radarPaused = false;
-            // 只有是雷达引起的暂停才恢复，不影响 upgradePanel 等其他暂停
-            if (!this.waveTransitioning) this.isPaused = false;
+            el.classList.remove('open');
+            this.isPaused = false;
         }
+    }
+
+    toggleMute() {
+        if (!this.audio) return;
+        this.audio.enabled = !this.audio.enabled;
+    }
+
+    toggleMenu() {
+        this.isPaused = true;
+        document.getElementById('mainMenu').style.display = 'block';
+        // show continue button since a run is active
+        const cont = document.getElementById('continueBtn');
+        if (cont) {
+            cont.disabled = false;
+            cont.style.opacity = '1';
+            document.getElementById('continueInfo').textContent = `Wave ${this.wave}`;
+        }
+    }
+
+    drawStatusRadar() {
+        const canvas2 = document.getElementById('radarCanvas');
+        if (!canvas2) return;
+        const ctx2 = canvas2.getContext('2d');
+        const cx = canvas2.width / 2;
+        const cy = canvas2.height / 2;
+        ctx2.clearRect(0, 0, canvas2.width, canvas2.height);
+        this.drawHeptagonRadar(ctx2, cx, cy, cx * 0.75);
+        ctx2.restore();
+        this.drawRadarCenterInfo(ctx2, cx, cy);
     }
 
     updateContainerScale() {
@@ -1850,11 +2445,299 @@ class Game {
         this.turret.cooldown = this.turret.stats.fireRate * 1.2 * effective.cooldownMultiplier;
     }
 
+    // ══════════════════════════════════════════
+    //  SNIPER
+    // ══════════════════════════════════════════
     fireWeapon_SNIPER() {
-        // TODO: 真实行为 - 超远射程，高暴击，穿透单体
-        this.fireBullet();
+        const target = this.findSniperTarget();
+        if (!target) return;
+
+        const effective = this.getEffectiveCombatStats();
+        const dist = Math.hypot(target.x - this.turret.x, target.y - this.turret.y);
+        if (dist < 600) return;  // 只打远目标
+
+        const viewBonus = 1 + (this.turret.stats.view / 200);
+        const damage    = effective.atk * 2.5 * viewBonus;
+
+        const angle = Math.atan2(target.y - this.turret.y, target.x - this.turret.x);
+        const speed = 18;
+
+        this.bullets.push({
+            x: this.turret.x, y: this.turret.y,
+            vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+            damage,
+            distance: 0, maxDistance: this.turret.stats.view * 1.2,
+            radius: 4,
+            speed,
+            type: 'SNIPER',
+            viewBonus,
+            hitEnemies: [],
+            trailParticles: []
+        });
+
+        // 准星标记目标
+        target.sniperTargeted = 30;
+
+        // 音效：尖锐短促
+        this.audio.playTone(1200, 0.08, 0.06, 'sawtooth');
+        this.audio.playTone(600,  0.15, 0.04, 'sine');
+
+        this.turret.cooldown = 150 * effective.cooldownMultiplier;
     }
 
+    findSniperTarget() {
+        let best = null, maxDist = -Infinity;
+        this.enemies.forEach(e => {
+            if (!this.isHostile(e)) return;
+            const dist = Math.hypot(e.x - this.turret.x, e.y - this.turret.y);
+            if (dist > this.turret.stats.view) return;
+            const threshold = this.turret.stats.view * 0.8;
+            if (dist < threshold) return;  // 太近的不打
+            if (dist > maxDist) { maxDist = dist; best = e; }
+        });
+        return best;
+    }
+
+    updateSniperBullets(dt) {
+        for (let i = this.bullets.length - 1; i >= 0; i--) {
+            const b = this.bullets[i];
+            if (b.type !== 'SNIPER') continue;
+
+            // 轨迹粒子
+            if (Math.random() < 0.5) {
+                b.trailParticles.push({ x: b.x, y: b.y, life: 14 });
+            }
+            b.trailParticles = b.trailParticles.filter(p => {
+                p.life -= dt;
+                return p.life > 0;
+            });
+
+            // 穿透检测
+            this.enemies.forEach(e => {
+                if (b.hitEnemies.includes(e)) return;
+                if (Math.hypot(b.x - e.x, b.y - e.y) < e.radius + b.radius) {
+                    const result = this.applyDamageWithCrit(b.damage, e);
+                    e.hp -= result.damage;
+                    b.hitEnemies.push(e);
+                    this.createExplosion(e.x, e.y, '#00f5d4', 10);
+                    this.createExplosion(e.x, e.y - 20, '#00f5d4', 4);
+                    if (e.hp <= 0) {
+                        this.onEnemyKilled(e);
+                        this.handleScoutDefeat(e);
+                        this.collectedResources[e.reward] = (this.collectedResources[e.reward] || 0) + 1;
+                        this.createExplosion(e.x, e.y, e.color, 8);
+                        const idx = this.enemies.indexOf(e);
+                        if (idx !== -1) this.enemies.splice(idx, 1);
+                    }
+                }
+            });
+        }
+    }
+
+    drawSniperBullets(ctx) {
+        this.bullets.forEach(b => {
+            if (b.type !== 'SNIPER') return;
+
+            // 轨迹
+            b.trailParticles.forEach(p => {
+                const alpha = p.life / 14;
+                ctx.fillStyle = `rgba(0,245,212,${alpha * 0.7})`;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // 弹头
+            ctx.save();
+            ctx.shadowBlur  = 14;
+            ctx.shadowColor = '#00f5d4';
+            ctx.fillStyle   = 'rgba(0,245,212,0.55)';
+            ctx.beginPath();
+            ctx.arc(b.x, b.y, b.radius + 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#ffffff';
+            ctx.shadowBlur = 0;
+            ctx.beginPath();
+            ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        });
+    }
+
+    drawSniperTargets(ctx) {
+        this.enemies.forEach(e => {
+            if (!e.sniperTargeted) return;
+            const flash = Math.sin(Date.now() / 80) * 0.4 + 0.6;
+            const size  = e.radius + 10, gap = 5;
+
+            ctx.save();
+            ctx.globalAlpha  = flash;
+            ctx.strokeStyle  = '#00f5d4';
+            ctx.lineWidth    = 1.5;
+
+            // 四角准星
+            [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx,sy]) => {
+                ctx.beginPath();
+                ctx.moveTo(e.x + sx * size,           e.y + sy * (size - gap));
+                ctx.lineTo(e.x + sx * size,           e.y + sy * size);
+                ctx.lineTo(e.x + sx * (size - gap),   e.y + sy * size);
+                ctx.stroke();
+            });
+
+            ctx.restore();
+            e.sniperTargeted--;
+        });
+    }
+
+    // ══════════════════════════════════════════
+    //  RAILGUN
+    // ══════════════════════════════════════════
+    fireWeapon_RAILGUN() {
+        if (!this.turret.railgunState) {
+            this.turret.railgunState = { phase: 'READY', chargeTimer: 0 };
+        }
+        // 实际发射由 updateRailgunCharge() 驱动，这里只触发蓄能
+        const state = this.turret.railgunState;
+        if (state.phase === 'READY' && this.turret.target && this.turret.cooldown <= 0) {
+            state.phase = 'CHARGING';
+            state.chargeTimer = 90;
+        }
+        // 占住 cooldown 防止 autoShoot 反复调用
+        this.turret.cooldown = 1;
+    }
+
+    updateRailgunCharge(dt) {
+        if (this.getActiveWeapon() !== 'RAILGUN') return;
+        if (!this.turret.railgunState) {
+            this.turret.railgunState = { phase: 'READY', chargeTimer: 0 };
+        }
+        const state = this.turret.railgunState;
+
+        switch (state.phase) {
+            case 'READY':
+                if (this.turret.target && this.turret.cooldown <= 0) {
+                    state.phase = 'CHARGING';
+                    state.chargeTimer = 90;
+                }
+                break;
+
+            case 'CHARGING':
+                state.chargeTimer -= dt;
+                if (!this.turret.target) { state.phase = 'READY'; state.chargeTimer = 0; break; }
+                if (state.chargeTimer <= 0) {
+                    state.phase = 'FIRING';
+                    this.executeRailgunFire();
+                }
+                break;
+
+            case 'FIRING':
+                state.phase = 'COOLDOWN';
+                break;
+
+            case 'COOLDOWN':
+                if (this.turret.cooldown <= 0) state.phase = 'READY';
+                break;
+        }
+    }
+
+    executeRailgunFire() {
+        if (!this.turret.target) return;
+        const angle      = Math.atan2(this.turret.target.y - this.turret.y, this.turret.target.x - this.turret.x);
+        const beamLength = 380;
+        const beamWidth  = 30;
+        const endX = this.turret.x + Math.cos(angle) * beamLength;
+        const endY = this.turret.y + Math.sin(angle) * beamLength;
+
+        const effective = this.getEffectiveCombatStats();
+        const baseDamage = effective.atk * 1.8;
+
+        this.enemies.forEach(e => {
+            const dist        = this.pointToLineDistance(e.x, e.y, this.turret.x, this.turret.y, endX, endY);
+            const toAngle     = Math.atan2(e.y - this.turret.y, e.x - this.turret.x);
+            let   angleDiff   = Math.abs(toAngle - angle);
+            if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
+            const fromTurret  = Math.hypot(e.x - this.turret.x, e.y - this.turret.y);
+
+            if (dist < beamWidth / 2 + e.radius && fromTurret < beamLength && angleDiff < Math.PI / 4) {
+                const result = this.applyDamageWithCrit(baseDamage, e);
+                e.hp -= result.damage;
+                this.createExplosion(e.x, e.y, '#ff9f1c', 6);
+                if (e.hp <= 0) {
+                    this.onEnemyKilled(e);
+                    this.handleScoutDefeat(e);
+                    this.collectedResources[e.reward] = (this.collectedResources[e.reward] || 0) + 1;
+                    this.createExplosion(e.x, e.y, e.color, 8);
+                    const idx = this.enemies.indexOf(e);
+                    if (idx !== -1) this.enemies.splice(idx, 1);
+                }
+            }
+        });
+
+        this.activeBeams.push({
+            type: 'RAILGUN',
+            x1: this.turret.x, y1: this.turret.y,
+            x2: endX, y2: endY,
+            width: beamWidth,
+            life: 20, maxLife: 20,
+            color: '#ff9f1c'
+        });
+
+        // 音效 + 震屏
+        this.audio.playTone(60,  0.5,  0.10, 'square');
+        this.audio.playTone(200, 0.25, 0.05, 'sawtooth');
+        this.screenShake = 15;
+        this.turret.cooldown = 240;
+    }
+
+    pointToLineDistance(px, py, x1, y1, x2, y2) {
+        const dx = x2 - x1, dy = y2 - y1;
+        const lenSq = dx * dx + dy * dy;
+        if (lenSq === 0) return Math.hypot(px - x1, py - y1);
+        const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / lenSq));
+        return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+    }
+
+    drawRailgunCharge(ctx) {
+        if (this.getActiveWeapon() !== 'RAILGUN') return;
+        const state = this.turret.railgunState;
+        if (!state || state.phase !== 'CHARGING') return;
+
+        const progress = 1 - (state.chargeTimer / 90);
+
+        // 能量环
+        for (let i = 0; i < 4; i++) {
+            const radius = 50 - i * 8 + Math.sin(Date.now() / 100 + i) * 3;
+            const alpha  = progress * (1 - i / 4) * 0.55;
+            ctx.strokeStyle = `rgba(255,159,28,${alpha})`;
+            ctx.lineWidth   = 2.5;
+            ctx.beginPath();
+            ctx.arc(this.turret.x, this.turret.y, radius, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+
+        // 炮管蓄能光效
+        ctx.save();
+        ctx.translate(this.turret.x, this.turret.y);
+        ctx.rotate(this.turret.angle);
+        ctx.shadowBlur  = 28 * progress;
+        ctx.shadowColor = '#ff9f1c';
+        ctx.fillStyle   = `rgba(255,159,28,${progress * 0.75})`;
+        ctx.fillRect(0, -5, 42, 10);
+
+        // 蓄能进度条
+        ctx.shadowBlur  = 0;
+        ctx.fillStyle   = 'rgba(0,0,0,0.65)';
+        ctx.fillRect(0, 14, 40, 4);
+        ctx.fillStyle   = '#ff9f1c';
+        ctx.fillRect(0, 14, 40 * progress, 4);
+        ctx.restore();
+
+        // 蓄能音效（渐强）
+        if (Math.random() < 0.08) {
+            const pitch = 200 + progress * 400;
+            this.audio.playTone(pitch, 0.05, 0.015 * progress, 'sine');
+        }
+    }
     fireWeapon_PLASMA() {
         const first = this.turret.target;
         if (!first) return;
@@ -1862,7 +2745,7 @@ class Game {
         const effective = this.getEffectiveCombatStats();
         const config    = this.plasmaConfig;
 
-        // SPECIAL stat scaling (Step 8)
+        // SPECIAL stat scaling
         const special    = this.turret.stats.special || 0;
         const maxChains  = config.maxChains  + Math.floor(special / 3);
         const chainRadius= config.chainRadius + special * 4;
@@ -1947,11 +2830,6 @@ class Game {
         this.audio.playTone(320, 0.12, 0.06, 'square');
     }
 
-    fireWeapon_RAILGUN() {
-        // TODO: 真实行为 - 穿透直线所有敌人，射程加成
-        this.fireBullet();
-    }
-
     fireWeapon_BIO_LAUNCHER() {
         this.updateBioLauncher();
     }
@@ -2026,6 +2904,7 @@ class Game {
     update(dt) {
         // 倒计时在 isPaused 期间仍需更新
         this.updateWaveCountdown(dt);
+        this.fogSystem.update(dt);
 
         if (this.gameOver || this.isPaused) return;
 
@@ -2135,6 +3014,9 @@ class Game {
             this.turret.angle += (targetAngle - this.turret.angle) * 0.2;
             this.autoShoot();
         }
+
+        this.updateRailgunCharge(dt);
+        this.updateSniperBullets(dt);
 
         // 敌人生成（Wave Packet System）
         if (this.currentPacket < this.wavePackets.length) {
@@ -2469,6 +3351,7 @@ class Game {
 
         // 🔥 Burn DoT tick
         this.updateBurn(dt);
+        this.updateXpBar();
 
         // BIO field update
         this.bioFields.forEach(field => {
@@ -2681,6 +3564,7 @@ class Game {
         };
 
         this.enemies.push(newEnemy);
+        this.enemiesSpawned++;
         this.createFusionEffect(newEnemy.x, newEnemy.y, fusionLevel);
     }
 
@@ -3443,48 +4327,27 @@ class Game {
     draw() {
         ctx.fillStyle = '#0f0f23';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        this.drawFog();
+
+        // 游戏对象先画
+        this.drawRailgunCharge(ctx);
         this.drawGameObjects();
+        this.drawSniperBullets(ctx);
+        this.drawSniperTargets(ctx);
         this.drawRelicEffects(ctx);
         this.drawAssimilationEffect(ctx);
         this.drawLineageFlash(ctx);
         this.drawRangeIndicators();
 
-        ctx.fillStyle = "#ffd700";
-        ctx.font = "12px monospace";
-        ctx.fillText(
-            "Relics: " + this.meta.relics,
-            10,
-            20
+        // 迷雾最后盖上去，挖出视野
+        this.fogSystem.draw(
+            ctx,
+            this.turret.x,
+            this.turret.y,
+            this.getEffectiveView(),
+            this.activeFlares || []
         );
 
-        ctx.fillStyle = "#ffd700";
-
-        ctx.font = "14px monospace";
-
-        ctx.fillText(
-            "Lineage: " + this.lineage,
-            10,
-            40
-        );
-
-        // Radar：平滑展开/收起动画
-        const radarTarget = this.radarExpanded ? 1 : 0;
-        this.radarTransition += (radarTarget - this.radarTransition) * 0.15;
-
-        // 展开时加遮罩
-        if (this.radarTransition > 0.01) {
-            ctx.fillStyle = `rgba(0,0,0,${0.55 * this.radarTransition})`;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-        }
-
-        const rcx    = lerp(canvas.width - 120, canvas.width / 2,  this.radarTransition);
-        const rcy    = lerp(canvas.height - 120, canvas.height / 2, this.radarTransition);
-        const rradius = lerp(70, 180, this.radarTransition);
-        this.drawHeptagonRadar(ctx, rcx, rcy, rradius);
-
-        // Wave 倒计时覆盖层
+        // Wave 倒计时覆盖层（在迷雾之上）
         this.drawWaveCountdown();
     }
 
@@ -3553,7 +4416,30 @@ class Game {
 
             ctx.save();
 
-            if (beam.type === 'PLASMA') {
+            if (beam.type === 'RAILGUN') {
+                const lifeFrac2 = beam.life / (beam.maxLife || 20);
+                // 外层宽光晕
+                ctx.globalAlpha = lifeFrac2 * 0.35;
+                ctx.strokeStyle = '#ff9f1c';
+                ctx.lineWidth   = (beam.width || 20) * lifeFrac2;
+                ctx.shadowBlur  = 40;
+                ctx.shadowColor = '#ff9f1c';
+                ctx.lineCap     = 'round';
+                ctx.beginPath();
+                ctx.moveTo(beam.x1, beam.y1);
+                ctx.lineTo(beam.x2, beam.y2);
+                ctx.stroke();
+                // 内层亮核
+                ctx.globalAlpha = lifeFrac2 * 0.9;
+                ctx.strokeStyle = '#ffe0a0';
+                ctx.lineWidth   = 3 * lifeFrac2;
+                ctx.shadowBlur  = 20;
+                ctx.beginPath();
+                ctx.moveTo(beam.x1, beam.y1);
+                ctx.lineTo(beam.x2, beam.y2);
+                ctx.stroke();
+
+            } else if (beam.type === 'PLASMA') {
                 const baseAlpha = (beam.alpha || 1) * lifeFrac;
                 ctx.globalAlpha = Math.max(0, baseAlpha);
                 ctx.strokeStyle = '#c77dff';
@@ -4176,12 +5062,6 @@ class Game {
             }
         }
 
-        // 展开时显示中心详情
-        if (this.radarExpanded) {
-            this.drawRadarCenterInfo(ctx, 0, 0);
-        }
-
-        ctx.restore();
     }
 
     drawRadarCenterInfo(ctx, cx, cy) {
@@ -4393,6 +5273,7 @@ class Game {
     }
 
     setText(key, el, value) {
+        if (!el) return;
         if (this.uiState[key] !== value) {
             this.uiState[key] = value;
             el.textContent = value;
@@ -4400,46 +5281,53 @@ class Game {
     }
 
     updateUI() {
-        // HP 文字：只在低血量（<50%）时显示具体数字，其余时间环形足够
-        const hpRatio = this.turret.stats.maxHp > 0 ? this.turret.stats.hp / this.turret.stats.maxHp : 0;
-        const hpText = hpRatio < 0.5
-            ? `❤️ ${Math.ceil(this.turret.stats.hp)}/${this.turret.stats.maxHp}`
-            : '';
-        this.ui.hp.style.color = hpRatio < 0.25 ? '#ff6b6b' : '#ffd93d';
-        this.ui.hp.style.textShadow = hpRatio < 0.25 ? '0 0 8px #ff6b6b' : '0 0 6px #ffd93d';
+    // HP 文字：只在低血量（<50%）时显示具体数字，其余时间环形足够
+    const hpRatio = this.turret.stats.maxHp > 0 ? this.turret.stats.hp / this.turret.stats.maxHp : 0;
+    const hpText = hpRatio < 0.5
+        ? `❤️ ${Math.ceil(this.turret.stats.hp)}/${this.turret.stats.maxHp}`
+        : '';
+    this.ui.hp.style.color = hpRatio < 0.25 ? '#ff6b6b' : '#ffd93d';
+    this.ui.hp.style.textShadow = hpRatio < 0.25 ? '0 0 8px #ff6b6b' : '0 0 6px #ffd93d';
 
-        let hostileCount = 0;
-        this.enemies.forEach(e => { if (this.isHostile(e)) hostileCount++; });
-        const remainingEnemies = hostileCount + Math.max(0, this.enemiesToSpawn - this.enemiesSpawned);
-        const waveText = `🌊 Wave ${this.wave}`;
-        const enemyText = `👾 敌人 ${this.enemiesToSpawn} / 剩余 ${remainingEnemies}`;
-        const resourceText = 
-            `🔥 ATK:${this.collectedResources.atk || 0} | ` +
-            `⚡ SPD:${this.collectedResources.speed || 0} | ` +
-            `🛡️ ARM:${this.collectedResources.armor || 0} | ` +
-            `🧨 FLR:${this.flareCharges}`;
+    let hostileCount = 0;
+    this.enemies.forEach(e => { if (this.isHostile(e)) hostileCount++; });
+    const remainingEnemies = hostileCount + Math.max(0, this.enemiesToSpawn - this.enemiesSpawned);
+    const waveText = `🌊 Wave ${this.wave}`;
+    const enemyText = `👾 敌人 ${this.enemiesToSpawn} / 剩余 ${remainingEnemies}`;
+    const resourceText = 
+        `🧨 FLR:${this.flareCharges}`;
 
-        this.setText('hp', this.ui.hp, hpText);        this.setText('wave', this.ui.wave, waveText);
-        this.setText('enemyStatus', this.ui.enemyStatus, enemyText);
-        this.setText('statusResources', this.ui.statusResources, resourceText);
-        this.setText('currentWeapon', this.ui.currentWeapon, this.getWeaponName(this.getActiveWeapon()));
-        this.setText('statAtk', this.ui.statAtk, String(this.turret.stats.atk));
-        this.setText('statSpeed', this.ui.statSpeed, this.turret.stats.speed.toFixed(1));
-        this.setText('statHp', this.ui.statHp, `${Math.ceil(this.turret.stats.hp)}/${this.turret.stats.maxHp}`);
-        const armorReduction = Math.min(this.turret.stats.armor * 0.05, 0.75);
-        this.setText('statArmor', this.ui.statArmor, `${(armorReduction * 100).toFixed(0)}%`);
-        this.setText('statRange', this.ui.statRange, String(Math.round(this.getEffectiveCombatStats().range)));
-        const viewVal = this.getEffectiveView();
-        const viewText = this.isStatCapped('VIEW') ? `${viewVal} (MAX)` : `${viewVal}/${this.viewCap}`;
-        this.setText('statView', this.ui.statView, viewText);
-        const critStats = this.computeCritStats(this.turret.stats.special || 0);
-        this.setText('statSpecial', this.ui.statSpecial, `${(critStats.critChance * 100).toFixed(0)}%`);
-        this.setText('weaponStatus', this.ui.weaponStatus, `🎯 ${this.getWeaponName(this.getActiveWeapon())}`);
-        this.ui.hp.style.top  = `${this.turret.y + 62}px`;
-        this.ui.hp.style.left = `${this.turret.x}px`;
-        this.updateRelicUI();
-        this.updateKeystoneUI();  // 第7步：更新基石UI
+    // 更新新的 UI 元素
+    if (this.ui.waveLabel) {
+        this.ui.waveLabel.textContent = `WAVE ${this.wave}`;
     }
+    
+    if (this.ui.enemyCounter) {
+        this.ui.enemyCounter.textContent = `${hostileCount} / ${this.enemiesToSpawn}`;
+    }
+
+    this.setText('hp', this.ui.hp, hpText);
+    this.setText('wave', this.ui.wave, waveText);
+    this.setText('enemyStatus', this.ui.enemyStatus, enemyText);
+    this.setText('statusResources', this.ui.statusResources, resourceText);
+    this.setText('currentWeapon', this.ui.currentWeapon, this.getWeaponName(this.getActiveWeapon()));
+    this.setText('statAtk', this.ui.statAtk, String(this.turret.stats.atk));
+    this.setText('statSpeed', this.ui.statSpeed, this.turret.stats.speed.toFixed(1));
+    this.setText('statHp', this.ui.statHp, `${Math.ceil(this.turret.stats.hp)}/${this.turret.stats.maxHp}`);
+    const armorReduction = Math.min(this.turret.stats.armor * 0.05, 0.75);
+    this.setText('statArmor', this.ui.statArmor, `${(armorReduction * 100).toFixed(0)}%`);
+    this.setText('statRange', this.ui.statRange, String(Math.round(this.getEffectiveCombatStats().range)));
+    const viewVal = this.getEffectiveView();
+    const viewText = this.isStatCapped('VIEW') ? `${viewVal} (MAX)` : `${viewVal}/${this.viewCap}`;
+    this.setText('statView', this.ui.statView, viewText);
+    const critStats = this.computeCritStats(this.turret.stats.special || 0);
+    this.setText('statSpecial', this.ui.statSpecial, `${(critStats.critChance * 100).toFixed(0)}%`);
+    this.setText('weaponStatus', this.ui.weaponStatus, `🎯 ${this.getWeaponName(this.getActiveWeapon())}`);
+    this.ui.hp.style.top  = `${this.turret.y + 62}px`;
+    this.ui.hp.style.left = `${this.turret.x}px`;
+    this.updateRelicUI();
+    this.updateKeystoneUI();  // 第7步：更新基石UI
+}
 
     showRelicReward() {
         if (!this.lastRelicGained) return;
@@ -4605,7 +5493,7 @@ class Game {
         }
 
         if (html === '') html = '<span style="color:#555">尚无遗物</span>';
-        this.ui.relicList.innerHTML = html;
+        if (this.ui.relicList) this.ui.relicList.innerHTML = html;
     }
 
     restart() { 
@@ -4628,38 +5516,16 @@ function startGame(loadSave)
     game.updateShieldStats();
     game.updateUI();
     game.isPaused = false;
-    game.setSpeed(1.0); // 初始化速度按钮高亮
+    game.setSpeed(1.0);
     game.loop();
 }
 
-document.getElementById("continueBtn").onclick = () =>
-{
-    startGame(true);
-};
-
-document.getElementById("newRunBtn").onclick = () =>
-{
-    localStorage.removeItem("infinityTowerSave");
-    startGame(false);
-};
-
-document.getElementById("resetBtn").onclick = () =>
-{
-    if(confirm("Reset ALL progress?"))
-    {
-        localStorage.clear();
-        location.reload();
-    }
-};
-
-const muteBtn = document.getElementById("muteBtn");
-muteBtn.onclick = () =>
-{
-    if (!game) return;
-    game.audio.enabled = !game.audio.enabled;
-    muteBtn.textContent = game.audio.enabled ? "🔊" : "🔇";
-    muteBtn.classList.toggle('muted', !game.audio.enabled);
-};
+document.getElementById("continueBtn")?.addEventListener("click", () => {
+    document.getElementById("mainMenu").style.display = "none";
+    if (game) game.isPaused = false;
+});
+document.getElementById("newRunBtn").onclick   = () => { localStorage.removeItem("infinityTowerSave"); startGame(false); };
+document.getElementById("resetBtn").onclick    = () => { if (confirm("Reset ALL progress?")) { localStorage.clear(); location.reload(); } };
 
 if (!localStorage.getItem("infinityTowerSave"))
 {
