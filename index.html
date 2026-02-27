@@ -905,15 +905,17 @@ class Game {
             overlayResources:document.getElementById('overlayResources'),
         };
 
-        this.autoEnabled = true;
+        this.autoWave = true;
 
         const autoBtn = document.getElementById("autoToggle");
         autoBtn.classList.add("active");
 
-        autoBtn.addEventListener("click", () => {
-            this.autoEnabled = !this.autoEnabled;
-            autoBtn.classList.toggle("active", this.autoEnabled);
-        });
+        autoBtn.onclick = () => {
+            this.autoWave = !this.autoWave;
+            autoBtn.classList.toggle("active", this.autoWave);
+            autoBtn.querySelector(".auto-label").textContent =
+                this.autoWave ? "AUTO" : "NEXT";
+        };
 
         // RAILGUN 功率控制按钮
         const railControls = document.getElementById('railgunControls');
@@ -995,7 +997,11 @@ class Game {
         this.statusExpanded = false;
         this.dockLastActive = Date.now();
 
-        this.speedMultiplier = 1;
+        this.speedMultiplier = 3;
+        this.timeScale = 3;
+
+        this.ui.speedToggle.textContent = 'x3';
+        this.ui.speedToggle.classList.add('active', 'turbo');
 
         this.ui.speedToggle.addEventListener("click", () => {
             if (this.speedMultiplier === 1) {
@@ -1050,7 +1056,14 @@ class Game {
         this.structureSpawnTimer = 0;
         this.particles = [];
         this.gameOver = false;
-        this.isPaused = false;
+        this.isPaused = true; // 由 waveCountdown 解除
+
+        this.armorForm = {
+            active: false,
+            type: null,
+            lastDominant: null
+        };
+        this.fireShieldTimer = 0;
         this.wave = 1;
         this.enemiesSpawned = 0;
         this.spawnTimer = 0;
@@ -1062,8 +1075,9 @@ class Game {
         this.laserTimer = 0;
         this.timeScale = 1.0;
         this.waveTransitioning = false;
-        this.waveCountdown = 0;
+        this.waveCountdown = 3;       // FIX 6: Wave 1 也显示倒数
         this.waveCountdownTimer = 0;
+        this.isPaused = true;          // 由 countdown 解除
         this.markedTarget = null;
         this.markTimer = 0;
         this.markCooldown = 0;
@@ -1160,7 +1174,8 @@ class Game {
             tank:   { hp: 300, speed: 0.5, damage: 2.0, radius: 22, color: '#95a5a6', reward: 'armor', attackCooldown: 75 },
             elite:  { hp: 400, speed: 0.7, damage: 2.0, radius: 18, color: '#f39c12', reward: 'special', attackCooldown: 70 },
             boss:   { hp: 900, speed: 0.45, damage: 3.5, radius: 40, color: '#9b59b6', reward: 'special', attackCooldown: 95 },
-            scout:  { hp: 80, speed: 2.2, damage: 0.8, radius: 11, color: '#f7d794', reward: 'special', attackCooldown: 75 }
+            scout:  { hp: 80, speed: 2.2, damage: 0.8, radius: 11, color: '#f7d794', reward: 'special', attackCooldown: 75 },
+            shield: { hp: 120, speed: 0.85, damage: 1.2, radius: 17, color: '#e74c3c', reward: 'armor', attackCooldown: 65 }
         };
 
         // ===== Meta Relic System =====
@@ -1925,6 +1940,17 @@ class Game {
             });
         }
 
+        // 🛡 Shield Unit 编成
+        // Wave Test A: wave 3~6，1 护盾兵
+        if (waveNumber >= 3 && waveNumber < 7) {
+            packets.push({ type: "shield", count: 1, interval: 300 });
+        }
+        // Wave Test B: wave 7+，2 护盾兵（每5波+1，最多5）
+        if (waveNumber >= 7) {
+            const shieldCount = Math.min(5, 2 + Math.floor((waveNumber - 7) / 5));
+            packets.push({ type: "shield", count: shieldCount, interval: 400 });
+        }
+
         return packets;
     }
 
@@ -2091,10 +2117,11 @@ class Game {
     const fill = this.ui.xpBarFill;
     if (!fill) return;
 
-    const total  = Math.max(1, this.enemiesToSpawn);
-    const alive  = this.enemies.filter(e => this.isHostile(e)).length;
-    const killed = total - alive;
-    const pct    = Math.min((killed / total) * 100, 100);
+    const total   = Math.max(1, this.enemiesToSpawn);
+    const alive   = this.enemies.filter(e => this.isHostile(e)).length;
+    const spawned = Math.min(this.enemiesSpawned, total);
+    const killed  = Math.max(0, spawned - alive);
+    const pct     = Math.min((killed / total) * 100, 100);
 
     fill.style.width = pct + '%';
 
@@ -2270,6 +2297,25 @@ class Game {
         const critMultiplier = 2.0 + special * 0.05;
         const critRadiusScale = 1.0 + special * 0.03;
         return { critChance, critMultiplier, critRadiusScale };
+    }
+
+    // Shield Unit 护甲拦截
+    // 返回 true 表示伤害被护甲完全吸收，调用方跳过扣血
+    applyArmorIntercept(damage, enemy) {
+        if (enemy.role !== 'shield' || enemy.armorLayers <= 0) return false;
+
+        enemy.armorHP -= damage;
+
+        if (enemy.armorHP <= 0) {
+            enemy.armorLayers--;
+            enemy.armorHP = enemy.armorLayers > 0 ? enemy.maxArmorHP : 0;
+
+            // 破盾特效
+            this.createExplosion(enemy.x, enemy.y, '#ff4444', 8);
+            this.audio.playTone(300, 0.12, 0.07, 'square');
+        }
+
+        return true; // 伤害被护甲吸收
     }
 
     applyDamageWithCrit(baseDamage, target) {
@@ -2609,6 +2655,11 @@ class Game {
                 if (b.hitEnemies.includes(e)) return;
                 if (Math.hypot(b.x - e.x, b.y - e.y) < e.radius + b.radius) {
                     const result = this.applyDamageWithCrit(b.damage, e);
+                    // Shield Unit 护甲拦截
+                    if (this.applyArmorIntercept(result.damage, e)) {
+                        b.hitEnemies.push(e);
+                        return;
+                    }
                     e.hp -= result.damage;
                     b.hitEnemies.push(e);
                     this.createExplosion(e.x, e.y, '#00f5d4', 10);
@@ -2644,6 +2695,53 @@ class Game {
     updateSniperRecoil() {
         const s = this.sniperState;
         if (s.recoilCooldown > 0) s.recoilCooldown--;
+    }
+
+    updateArmorForm() {
+        const armor    = this.turret.stats.armor;
+        const dominant = this.getDominantNode();
+
+        if (armor >= 4 && dominant === 'ATK') {
+            this.armorForm.active = true;
+            this.armorForm.type   = 'FIRE';
+        } else {
+            this.armorForm.active = false;
+            this.armorForm.type   = null;
+        }
+    }
+
+    updateFireShield() {
+        if (!this.armorForm.active)         return;
+        if (this.armorForm.type !== 'FIRE') return;
+        if (this.turret.shield.current <= 0) return;
+
+        this.fireShieldTimer--;
+        if (this.fireShieldTimer > 0) return;
+
+        const radius = 180;
+        const damage = this.turret.stats.atk * 0.6;
+
+        this.enemies.forEach(e => {
+            if (e.faction === 'PLAYER') return;
+            const dist = Math.hypot(e.x - this.turret.x, e.y - this.turret.y);
+            if (dist <= radius) {
+                // Shield Unit 护甲也受到火盾灼烧
+                if (!this.applyArmorIntercept(damage, e)) {
+                    e.hp -= damage;
+                }
+                this.createExplosion(e.x, e.y, '#ff6a00', 4);
+                if (e.hp <= 0) {
+                    this.onEnemyKilled(e);
+                    this.handleScoutDefeat(e);
+                    this.collectedResources[e.reward] = (this.collectedResources[e.reward] || 0) + 1;
+                    this.createExplosion(e.x, e.y, e.color, 8);
+                    const idx = this.enemies.indexOf(e);
+                    if (idx !== -1) this.enemies.splice(idx, 1);
+                }
+            }
+        });
+
+        this.fireShieldTimer = 30;
     }
 
     getSniperTarget(minRange, maxRange) {
@@ -2845,10 +2943,15 @@ class Game {
         });
 
         hitList.forEach(e => {
-            // 满格：忽略护盾
+            // 满格：忽护盾（但不忽略护甲层，满格才是真正的"贯穿"）
             let finalDamage = damage;
             if (isMax) {
-                finalDamage += (e.shield || 0); // 穿透护盾
+                finalDamage += (e.shield || 0);
+            }
+            // Shield Unit 护甲拦截（满格 RAILGUN 直接穿透护甲）
+            if (!isMax && this.applyArmorIntercept(finalDamage, e)) {
+                this.createExplosion(e.x, e.y, '#ff9f1c', 3);
+                return;
             }
             const result = this.applyDamageWithCrit(finalDamage, e);
             e.hp -= result.damage;
@@ -3225,6 +3328,8 @@ class Game {
         this.updateSniperBullets(dt);
         this.updateSniperReload();
         this.updateSniperRecoil();
+        this.updateArmorForm();
+        this.updateFireShield();
 
         // 敌人生成（Wave Packet System）
         if (this.currentPacket < this.wavePackets.length) {
@@ -3345,9 +3450,7 @@ class Game {
                     // ARM-T3-A: Absolute Defense — 永久减伤50%（GLOBAL）
                     if (this.isModifierActive('ARM-T3-A')) damage *= 0.5;
 
-                    // armor damage reduction
-                    const damageReduction = Math.min(this.turret.stats.armor * 0.05, 0.75);
-                    damage *= (1 - damageReduction);
+                    // （线性 armor 减伤已移除 → 由 shield + HP 全量承担）
 
                     if (e.state === "ATTACKING_SHIELD") {
                         const shield = this.turret.shield;
@@ -3434,7 +3537,13 @@ class Game {
                 if (Math.hypot(b.x - e.x, b.y - e.y) < e.radius + b.radius) {
                     const hitResult = this.applyDamageWithCrit(b.damage, e);
                     let finalDmg = hitResult.damage;
-                    
+
+                    // Shield Unit 护甲拦截
+                    if (this.applyArmorIntercept(finalDmg, e)) {
+                        this.bullets.splice(j, 1);
+                        continue;
+                    }
+
                     e.hp -= finalDmg;
 
                     // 🔥 INCENDIARY: apply burn on hit
@@ -3795,6 +3904,58 @@ class Game {
         this.spawnFloatingText(x, y - 24, label, '#cc44ff', 1.1);
     }
 
+    showNextWaveButton() {
+        // NEXT 模式：在升级面板里只显示一个"下一波"按钮，点击后自动选第一个升级并推进
+        const panel = this.ui.upgradePanel;
+        const btnContainer = this.ui.upgradeButtons;
+        btnContainer.innerHTML = '';
+
+        // 仍然生成升级选项（点击 NEXT 时才真正应用）
+        const optKeyToStatKey = { atk: 'ATK', speed: 'SPEED', maxHp: 'HP', armor: 'ARMOR', special: 'SPECIAL', range: 'RANGE', view: 'VIEW' };
+        const pool = this.upgradeOptions.filter(opt => {
+            const statKey = optKeyToStatKey[opt.key];
+            return !statKey || !this.isStatCapped(statKey);
+        });
+        if (pool.length === 0) pool.push({ key: 'special', label: '✨ 特殊 +1', value: 1, desc: '提升暴击率' });
+
+        const choices = [];
+        const tempPool = [...pool];
+        for (let i = 0; i < 3; i++) {
+            if (tempPool.length === 0) break;
+            const idx = Math.floor(Math.random() * tempPool.length);
+            choices.push(tempPool.splice(idx, 1)[0]);
+        }
+
+        // 显示升级选项供玩家选择
+        choices.forEach(opt => {
+            const btn = document.createElement('button');
+            btn.innerHTML = `
+                <div style="font-weight: bold;">${opt.label}</div>
+                <div style="font-size: 12px; color: #aaa; margin-top: 5px;">${opt.desc}</div>
+            `;
+            btn.onclick = () => this.applyUpgrade(opt);
+            btnContainer.appendChild(btn);
+        });
+
+        this.ui.upgradeTitle.textContent = `Wave ${this.wave} 完成!`;
+
+        const hint = this.ui.weaponHint;
+        const dominant = this.getDominantNode();
+        if (dominant) {
+            const weapon = this.weaponTier1Map[dominant];
+            const color  = this.weaponColors[weapon];
+            hint.style.display = 'block';
+            hint.style.borderColor = color;
+            hint.innerHTML = `<span style="color:${color}">⚡ ${this.getWeaponName(weapon)}</span> 已激活（${dominant} 领先）`;
+        } else {
+            hint.style.display = 'block';
+            hint.style.borderColor = '#888';
+            hint.innerHTML = `<span style="color:#888">💡 某属性达到 1.25x 优势时解锁专属武器</span>`;
+        }
+
+        panel.style.display = 'block';
+    }
+
     checkWaveComplete() {
         if (this.waveTransitioning) return;
         const allSpawned = this.enemiesSpawned >= this.enemiesToSpawn;
@@ -3819,7 +3980,11 @@ class Game {
                 this.ui.victory.style.display = 'block';
                 this.gameOver = true;
             } else {
-                this.showUpgradePanel();
+                if (this.autoWave) {
+                    this.showUpgradePanel();
+                } else {
+                    this.showNextWaveButton();
+                }
             }
         }
     }
@@ -3865,7 +4030,8 @@ class Game {
             tank: "TANK",
             elite: "ELITE",
             boss: "BOSS",
-            scout: "SCOUT"
+            scout: "SCOUT",
+            shield: "SHIELD"
         };
         const type = typeMap[role] || "NORMAL";
 
@@ -3924,6 +4090,16 @@ class Game {
             enemy.canDropFlare = true;
             enemy.priorityTarget = 'BEACON';
             enemy.hasEnteredForwardZone = false;
+        }
+
+        // Shield Unit 护甲层初始化
+        if (type === 'SHIELD') {
+            enemy.role         = 'shield';
+            enemy.maxArmorLayers = 3;
+            enemy.armorLayers  = 3;
+            enemy.armorHP      = 30;
+            enemy.maxArmorHP   = 30;
+            enemy.speed       *= 0.85;
         }
 
         this.enemies.push(enemy);
@@ -4880,6 +5056,33 @@ class Game {
             ctx.arc(e.x, e.y, e.radius, 0, Math.PI*2); 
             ctx.fill();
 
+            // 🛡 Shield Unit 护甲环
+            if (e.role === 'shield' && e.armorLayers > 0) {
+                const colors = ['#ff4444', '#cc2222', '#881111'];
+                for (let ring = 0; ring < e.armorLayers; ring++) {
+                    const r    = e.radius + 6 + ring * 5;
+                    const col  = colors[ring] || '#881111';
+                    const hpFrac = ring === 0 ? (e.armorHP / e.maxArmorHP) : 1;
+                    ctx.save();
+                    // 已损耗部分（暗）
+                    ctx.strokeStyle = 'rgba(80,0,0,0.4)';
+                    ctx.lineWidth   = 3;
+                    ctx.beginPath();
+                    ctx.arc(e.x, e.y, r, 0, Math.PI * 2);
+                    ctx.stroke();
+                    // 剩余护甲（亮）
+                    ctx.strokeStyle = col;
+                    ctx.shadowBlur  = 8;
+                    ctx.shadowColor = col;
+                    ctx.lineWidth   = 3;
+                    ctx.beginPath();
+                    ctx.arc(e.x, e.y, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * hpFrac);
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+                    ctx.restore();
+                }
+            }
+
             // ── Fusion visual overlay ──────────────────────────────
             if (e.fused) {
                 const fl = e.fusionLevel || 1;
@@ -5479,6 +5682,28 @@ class Game {
 
         ctx.shadowBlur = 0;
         ctx.restore();
+
+        // 🔥 Fire Shield Form — 外圈火焰光晕
+        if (this.armorForm.active && this.armorForm.type === 'FIRE' && shield.current > 0) {
+            const flicker = 0.55 + 0.35 * Math.sin(Date.now() * 0.012);
+            const pulse   = SH_R + flashOffset + 8 + Math.sin(Date.now() * 0.008) * 3;
+            ctx.save();
+            ctx.strokeStyle = `rgba(255,106,0,${flicker})`;
+            ctx.lineWidth   = 3;
+            ctx.shadowBlur  = 18;
+            ctx.shadowColor = '#ff4400';
+            ctx.beginPath();
+            ctx.arc(this.turret.x, this.turret.y, pulse, 0, Math.PI * 2);
+            ctx.stroke();
+            // 内层细线
+            ctx.strokeStyle = `rgba(255,200,50,${flicker * 0.6})`;
+            ctx.lineWidth   = 1.5;
+            ctx.shadowBlur  = 6;
+            ctx.beginPath();
+            ctx.arc(this.turret.x, this.turret.y, pulse - 5, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+        }
     }
 
     setText(key, el, value) {
@@ -5524,7 +5749,10 @@ class Game {
     this.setText('statSpeed', this.ui.statSpeed, this.turret.stats.speed.toFixed(1));
     this.setText('statHp', this.ui.statHp, `${Math.ceil(this.turret.stats.hp)}/${this.turret.stats.maxHp}`);
     const armorReduction = Math.min(this.turret.stats.armor * 0.05, 0.75);
-    this.setText('statArmor', this.ui.statArmor, `${(armorReduction * 100).toFixed(0)}%`);
+    const shieldVal = this.turret.shield.max > 0
+        ? `${Math.max(0, Math.ceil(this.turret.shield.current))} / ${this.turret.shield.max}`
+        : '—';
+    this.setText('statArmor', this.ui.statArmor, shieldVal);
     this.setText('statRange', this.ui.statRange, String(Math.round(this.getEffectiveCombatStats().range)));
     const viewVal = this.getEffectiveView();
     const viewText = this.isStatCapped('VIEW') ? `${viewVal} (MAX)` : `${viewVal}/${this.viewCap}`;
@@ -5624,15 +5852,8 @@ class Game {
     }
 
     applyRelics() {
-        try {
-            const saved = JSON.parse(localStorage.getItem('metaRelics'));
-            if (saved) {
-                // 防御性合并：只覆盖已知字段，避免旧存档缺字段导致 undefined
-                for (let key in this.metaRelics) {
-                    if (saved[key]) this.metaRelics[key] = saved[key];
-                }
-            }
-        } catch(e) {}
+        // metaRelics 在 constructor 里已从 localStorage 正确加载
+        // 无需再次读取，直接使用 this.metaRelics 应用加成
 
         // 加载 keystones
         try {
@@ -5652,7 +5873,7 @@ class Game {
                 case 'ATK':     bonus = 2 * multiplier;   break;
                 case 'SPEED':   bonus = 0.25 * multiplier; break;
                 case 'HP':      bonus = 15 * multiplier;  break;
-                case 'ARMOR':   bonus = 2 * multiplier;   break;
+                case 'ARMOR':   bonus = 0; break; // 暂时关闭：armor relic 重构中
                 case 'SPECIAL': bonus = 2 * multiplier;   break;
                 case 'RANGE':   bonus = 20 * multiplier;  break;
                 case 'VIEW':    bonus = 40 * multiplier;  break;
@@ -5724,14 +5945,13 @@ function startGame(loadSave)
 
     game.updateShieldStats();
     game.updateUI();
-    game.isPaused = false;
+    // isPaused 由 waveCountdown 控制，不在此处覆盖
     game.setSpeed(1.0);
     game.loop();
 }
 
 document.getElementById("continueBtn")?.addEventListener("click", () => {
-    document.getElementById("mainMenu").style.display = "none";
-    if (game) game.isPaused = false;
+    startGame(true);
 });
 document.getElementById("newRunBtn").onclick   = () => { localStorage.removeItem("infinityTowerSave"); startGame(false); };
 document.getElementById("resetBtn").onclick    = () => { if (confirm("Reset ALL progress?")) { localStorage.clear(); location.reload(); } };
