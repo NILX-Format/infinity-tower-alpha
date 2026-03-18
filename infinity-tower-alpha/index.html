@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Infinity Tower · 基石遗物</title>
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="760" height="1080"></canvas>
+        
+        <div class="stat" id="hp">❤️ HP: 10/10</div>
+
+        <div id="systemControls">
+
+            <!-- Speed toggle -->
+            <div id="speedToggle" class="hud-btn speed-btn">x1</div>
+
+            <!-- System gear + dropdown -->
+            <div id="systemWrapper">
+                <div id="systemToggle" class="hud-btn system-gear-btn">⚙</div>
+
+                <div id="systemPanel">
+                    <div id="soundToggle" class="system-item">
+                        <span class="si-icon">🔊</span>
+                        <span class="si-label">SOUND</span>
+                        <span class="si-state on" id="soundState">ON</span>
+                    </div>
+                    <div class="system-divider"></div>
+                    <div id="menuToggle" class="system-item">
+                        <span class="si-icon">☰</span>
+                        <span class="si-label">MENU</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Build — opens status overlay -->
+            <div id="buildToggle" class="hud-btn build-btn" onclick="game && game.toggleStatusOverlay(true)">⚒</div>
+
+        </div>
+
+        <!-- RAILGUN 功率控制（仅 RAILGUN 武器时显示）-->
+        <div id="railgunControls" style="
+            display: none;
+            position: absolute;
+            top: 70px;
+            left: 20px;
+            align-items: center;
+            gap: 6px;
+            z-index: 100;
+        ">
+            <div id="railPowerDown" style="
+                width: 28px; height: 28px;
+                border-radius: 6px;
+                background: rgba(255,100,50,0.12);
+                border: 1px solid rgba(255,100,50,0.35);
+                color: #ff9f1c;
+                font-size: 16px;
+                display: flex; align-items: center; justify-content: center;
+                cursor: pointer; font-family: monospace;
+                user-select: none;
+            ">−</div>
+            <div id="railPowerLabel" style="
+                color: #ff9f1c;
+                font-family: monospace;
+                font-size: 11px;
+                letter-spacing: 1px;
+                min-width: 44px;
+                text-align: center;
+            ">PWR 1/5</div>
+            <div id="railPowerUp" style="
+                width: 28px; height: 28px;
+                border-radius: 6px;
+                background: rgba(255,100,50,0.12);
+                border: 1px solid rgba(255,100,50,0.35);
+                color: #ff9f1c;
+                font-size: 16px;
+                display: flex; align-items: center; justify-content: center;
+                cursor: pointer; font-family: monospace;
+                user-select: none;
+            ">+</div>
+        </div>
+
+        <div id="combatHUD">
+            <div id="waveLabel">WAVE 1</div>
+            <div id="xpBarContainer">
+                <div id="xpBarFill"></div>
+            </div>
+            <div id="enemyCounter">0 / 0</div>
+            <div id="autoToggle" class="active"><span class="auto-label">AUTO</span></div>
+        </div>
+
+        <!-- ── Full-screen Status Overlay ── -->
+        <div id="statusOverlay">
+            <div class="overlay-close">
+                <span class="overlay-close-btn" onclick="game.toggleStatusOverlay(false)">✕</span>
+            </div>
+            <h2 id="overlayTitle">SYSTEM STATUS</h2>
+
+            <!-- Hidden span targets so updateUI() doesn't crash -->
+            <span id="currentWeapon"   style="display:none"></span>
+            <span id="statAtk"         style="display:none"></span>
+            <span id="statSpeed"       style="display:none"></span>
+            <span id="statHp"          style="display:none"></span>
+            <span id="statArmor"       style="display:none"></span>
+            <span id="statRange"       style="display:none"></span>
+            <span id="statView"        style="display:none"></span>
+            <span id="statSpecial"     style="display:none"></span>
+            <span id="statusResources" style="display:none"></span>
+            <span id="weaponStatus2"   style="display:none"></span>
+
+            <!-- Stat table -->
+            <div id="fullStatDisplay"></div>
+
+            <!-- 7-node radar -->
+            <canvas id="radarCanvas" width="200" height="200" style="margin:12px 0;display:block;"></canvas>
+
+            <!-- Resources -->
+            <div id="overlayResources"></div>
+
+            <!-- Relic list -->
+            <div style="width:min(300px,86vw);margin-top:12px;">
+                <div style="color:#ffd93d;font-size:calc(11px * var(--ui-scale));letter-spacing:1px;margin-bottom:6px;">RELICS</div>
+                <div id="relicList" style="font-size:calc(11px * var(--ui-scale));line-height:1.7;font-family:monospace;">
+                    <span style="color:#555">尚无遗物</span>
+                </div>
+            </div>
+
+            <!-- Keystone list -->
+            <div style="width:min(300px,86vw);margin-top:12px;padding-bottom:20px;">
+                <div style="color:#c77dff;font-size:calc(11px * var(--ui-scale));letter-spacing:1px;margin-bottom:6px;">KEYSTONES</div>
+                <div id="keystoneList" style="font-size:calc(10px * var(--ui-scale));line-height:1.8;font-family:monospace;">
+                    <span style="color:#555">无</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="gameOver">
+            <h1>💀 炮台被摧毁!</h1>
+            <p id="failWave">Wave 1 失败</p>
+            <div id="runSummary"></div>
+            <div id="runHistory"></div>
+            <!-- 遗物奖励区域 (第3步) -->
+            <div id="relicReward" style="margin-top:10px; color:#ffd93d; font-family:monospace;"></div>
+            <!-- 基石奖励区域 (第4步) -->
+            <div id="keystoneReward" style="margin-top:10px; color:#c77dff; font-family:monospace;"></div>
+            <button onclick="game.restart()">重新开始</button>
+        </div>
+        
+        <div id="victory">
+            <h2>🎉 胜利!</h2>
+            <p>完成 300 波!</p>
+            <button onclick="game.restart()">再玩一次</button>
+        </div>
+
+        <div id="upgradePanel">
+            <h3 id="upgradeTitle">Wave 完成!</h3>
+            <div style="color: #ffd93d; margin: 10px 0;">选择一个升级:</div>
+            <div id="upgradeButtons"></div>
+            <div class="weapon-indicator" id="weaponHint" style="display: none;">
+                提示: 再升级 SPEED 可能解锁激光!
+            </div>
+        </div>
+
+        <div id="runTagline">
+            <span class="auto-mode">🤖 Infinity Tower · 基石传承</span> | 自动战斗 | 波次升级 | 遗物永久成长
+        </div>
+
+        <div id="versionLabel">v1.3.8 alpha</div>
+    </div>
+
+    <div id="mainMenu">
+
+    <h1 style="margin-top:0">Infinity Tower</h1>
+
+    <button id="continueBtn">▶ Continue Run</button>
+    <div id="continueInfo" style="font-size:11px;color:#4ecdc4;margin-top:4px;min-height:16px;"></div>
+    <br>
+
+    <button id="newRunBtn">⚡ New Run</button>
+    <div style="font-size:11px;color:#888;margin-top:4px;">从头开始（永久遗物保留）</div>
+    <br>
+
+    <button id="resetBtn" style="color:#ff6b6b">
+    Reset Progress
+    </button>
+
+    <br><br>
+
+    <div style="font-size:12px;color:#777">
+    v1.3.8 a
+    </div>
+
+    </div>
+
+<script src="./js/systems/audio.js"></script>
+<script src="./js/systems/fog.js"></script>
+<script src="./js/systems/weapon-state.js"></script>
+<script src="./js/systems/weapons.js"></script>
+<script src="./js/systems/enemies.js"></script>
+<script src="./js/systems/waves.js"></script>
+<script src="./js/systems/keystone.js"></script>
+<script src="./js/systems/relics.js"></script>
+<script src="./js/systems/modifier-system.js"></script>
+<script src="./js/systems/visibility-system.js"></script>
+<script src="./js/systems/targeting-system.js"></script>
+<script src="./js/systems/world-state.js"></script>
+<script src="./js/systems/combat-context.js"></script>
+<script src="./js/systems/input-controller.js"></script>
+<script src="./js/systems/shield.js"></script>
+<script src="./js/systems/combat.js"></script>
+<script src="./js/systems/run-summary.js"></script>
+<script src="./js/systems/rage-system.js"></script>
+<script src="./js/systems/survival.js"></script>
+<script src="./js/core/state.js"></script>
+<script src="./js/core/loop.js"></script>
+<script src="./js/utils/math.js"></script>
+<script src="./js/utils/helpers.js"></script>
+<script src="./js/data/config.js"></script>
+<script src="./js/data/enemy-data.js"></script>
+<script src="./js/data/weapon-data.js"></script>
+<script src="./js/data/relic-data.js"></script>
+<script src="./js/save/save.js"></script>
+<script src="./js/ui/effects.js"></script>
+<script src="./js/ui/format.js"></script>
+<script src="./js/ui/hud.js"></script>
+<script src="./js/ui/overlays.js"></script>
+<script src="./js/ui/enemy-renderer.js"></script>
+<script src="./js/ui/weapon-renderer.js"></script>
+<script src="./js/ui/world-renderer.js"></script>
+<script src="./js/ui/status-overlay.js"></script>
+<script src="./js/main.js"></script>
+<script src="./js/core/game.js"></script>
+<script src="./js/systems/wall.js"></script>
+</body>
+</html>
